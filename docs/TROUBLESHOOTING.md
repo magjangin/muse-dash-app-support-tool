@@ -61,3 +61,10 @@ adb shell appops set com.hwa.musedash.assistant MANAGE_EXTERNAL_STORAGE allow
 
 - 인터넷 연결을 확인하고 hwa.moe 탭 오른쪽 위 **🔄 새로고침**을 누르세요.
 - 다운로드 파일은 hwa.moe를 거쳐 Cloudflare R2 저장소에서 받습니다. 브라우저에서 `https://hwa.moe`가 열리는지도 확인해 보세요.
+
+## XAPK 설치가 "XAPK 처리 중 오류 … ENOENT"로 끝나요
+
+v1.0.2 이하에서 생기던 문제입니다. Android 11 이상에서는 **'출처를 알 수 없는 앱 설치'를 허용받은 앱만** 다른 앱의 OBB 폴더(`/Android/obb/...`)에 쓸 수 있는데, 예전 앱은 이 허용을 OBB를 다 푼 뒤에야 물었습니다.
+
+- v1.0.3 이상으로 업데이트하세요. [설치]를 누르면 허용 화면이 먼저 열립니다.
+- 또는 **설정 → 애플리케이션 → 뮤즈대시 모드 비서 → 출처를 알 수 없는 앱 설치**를 켠 뒤 [설치]를 다시 누르세요.

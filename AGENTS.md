@@ -35,20 +35,18 @@
 2. **hwa.moe 온라인 커스텀 곡 다운로더 & 주입기 (Online Store)**:
    - 화평님의 공식 커스텀 앨범 플랫폼 `https://hwa.moe` Supabase REST API 연동.
    - 온라인 앨범 실시간 탐색 (자켓 커버, 곡 제목, 난이도 뱃지, 태그).
-   - [⬇️ 주입] 원클릭 시 `https://hwa.moe/api/download/<album_id>`에서 ZIP 스트림 다운로드 -> `/storage/emulated/0/MuseDash/hwa/` 및 `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`로 동시 자동 압축 해제 및 주입.
+   - [⬇️ 주입] 원클릭 시 `https://hwa.moe/api/download/<album_id>`에서 ZIP 스트림 다운로드 -> `/storage/emulated/0/MuseDash/hwa/`에 압축 해제. 게임은 다음 시작 때 `SongProvider`로 가져간다 (#10). v1.0.3부터 게임 폴더(`Android/data/.../files/hwa/`)에 직접 쓰는 미러링 코드는 없다 (#8 정정).
    - 이미 기기에 설치된 곡 자동 감지 (`[✅ 설치됨]` 및 `[🗑️]` 삭제 지원).
    - 삭제 시 다시 `[⬇️ 주입]`으로 자동 전환되어 자유로운 다운로드/삭제 루프 지원.
 3. **커스텀 곡 & 런처 (Custom Songs & Launcher)**:
    - 기기 내 등록된 커스텀 곡 목록 실시간 파싱 및 세부 메타데이터(BMS, BGM, 자켓) 표시.
-   - 각 곡별 **`[🗑️ 삭제]`** 버튼 지원: 터치 시 공용 및 앱 내부 저장소에서 동시 안전 제거.
+   - 각 곡별 **`[🗑️ 삭제]`** 버튼 지원: 공용 폴더에서 지운다. 게임 폴더의 사본은 게임이 다음 시작 때 지운다(`.from_assistant` 표시가 있는 폴더만, adb로 넣은 곡은 그대로).
    - `[ ▶ 뮤즈대시 모드 실행하기 ]` 터치 시 `com.prpr.musedash.mod` 앱 자동 런칭.
 4. **XAPK 탐색 및 인스톨러 (XAPK Manager)**:
    - 기기 내 다운로드 폴더의 `.xapk` / `.apk` 자동 탐색 (MuseDash 관련 파일 하이라이트).
    - XAPK 감지 시 내부 ZIP 스트림에서 `base.apk`를 캐시로 임시 추출 후 `GenericFileProvider`를 통해 시스템 패키지 설치 창 자동 호출.
-   - XAPK 내 `*.obb` 파일 존재 시 `/storage/emulated/0/Android/obb/com.prpr.musedash.mod/` 경로로 자동 추출/배치.
-3. **커스텀 곡 & 런처 (Custom Songs & Launcher)**:
-   - `/sdcard/MuseDash/hwa/` 내부 폴더 목록 실시간 파싱 및 등록된 커스텀 곡 수 표시.
-   - `[ ▶ 뮤즈대시 모드 실행하기 ]` 터치 시 `com.prpr.musedash.mod` 앱 자동 런칭.
+   - XAPK 내 `*.obb`는 항목 경로(`Android/obb/<패키지>/...`) 그대로, 그런 경로가 아니면 `manifest.json`의 `package_name` 폴더로 배치한다(v1.0.3, 전엔 `com.prpr.musedash.mod` 고정). 같은 크기 OBB가 이미 있으면 건너뛴다.
+   - XAPK는 압축을 풀기 **전에** `canRequestPackageInstalls()`를 확인하고, 없으면 '출처를 알 수 없는 앱 설치' 설정 화면을 띄운다 (#12).
 
 ---
 
@@ -57,7 +55,7 @@
 # 1. 원클릭 빌드 (AAPT2 리소스 컴파일 -> javac -> d8 dex -> uber-apk-signer 서명)
 python build_apk.py
 
-# 산출물: build/bin/MuseDash_Mod_Assistant.apk (약 33KB)
+# 산출물: build/bin/MuseDash_Mod_Assistant.apk (약 50KB)
 
 # 2. 실기기(ADB) 설치
 nox_adb -s R3CR10T2JFA push "build\bin\MuseDash_Mod_Assistant.apk" /data/local/tmp/app.apk
@@ -92,6 +90,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
 5. **Android 15 Scoped Storage의 `/Android/data/` 직접 쓰기 차단(EACCES)**:
    - `MANAGE_EXTERNAL_STORAGE` 권한을 받아도 Android 시스템 보안 정책상 다른 패키지의 비공개 데이터 경로(`/Android/data/com.prpr.musedash.mod/`)는 UID 접근이 차단되어 `FileOutputStream` 생성 시 `Permission denied` 예외 발생.
    - -> 공용 경로(`/sdcard/MuseDash/hwa/`)를 1순위 주입 타깃으로 안전하게 기록하고, `Android/data` 미러링은 쓰기 가능 여부 사전 프로브 및 예외 격리(Graceful Fallback) 처리하여 다운로드 중단 원천 해결.
+   - **v1.0.3**: 미러링 코드(다운로드 때 사본 쓰기, `syncSongsToGameDataDir`의 곡 복사·삭제, 삭제 때 게임 폴더 지우기)를 뺐다. Android 11+에선 어차피 실패했고, 쓸 수 있는 기기(Android 10 이하)에선 공용 폴더에 없는 곡을 게임 폴더에서 지워 install.bat·push_songs.bat으로 넣은 곡까지 날릴 수 있었다. `syncSongsToGameDataDir`의 아이콘 복사 부분은 #10의 사용자 지시대로 그대로 두었다.
 6. **WebView `confirm()` 다이얼로그 차단 버그**:
    - Android WebView 환경에서는 기본 `WebChromeClient`가 없거나 `onJsConfirm()`이 구현되지 않으면 JavaScript의 `confirm()`이 항상 `false`를 반환하여 삭제 로직이 실행되지 않고 무시됨.
    - -> WebView의 브라우저 기본 모달 의존성을 제거하여 원터치 즉시 삭제 및 Toast 알림으로 직결하고, `WebChromeClient`를 등록하여 콘솔 로그 추적 지원.
@@ -133,3 +132,13 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
    - 해결: PC `GhostNoteVisibility` 규칙 그대로. 곡 `info.txt`에 값이 있으면 그 값, 없으면 `currentConfig.showGhostNotes`. `battleSerial()`이 바뀌면 `opaqueState`만 비운다. `originalAlphas`는 끌 때 되돌리려고 유지한다.
    - 확인: 공식 곡 플레이 중 `{"t":"ghost-alpha","anim":"in_nor_38","opaque":true}`가 찍혔다 (수정 전에는 공식 곡에서 이 이벤트가 없음). 개인 전체판·공개본 양쪽 `ghost.ts`에 반영했다.
    - 공개본 동기화: 이때 공개본 `config.ts`(공용 config.txt 읽기)·`customTag.ts`(공용 아이콘 경로 탐색)도 전체판과 맞췄다. 이 세션 전 공개 릴리스는 전체판이라 원래 이 동작이었다. 아이콘 파일 자체는 건드리지 않았다.
+12. **XAPK 설치가 OBB 단계에서 `ENOENT`로 실패 (2026-11-01, 실기 원인 확인)**:
+   - 증상: [설치]를 누르면 "XAPK 처리 중 오류: /storage/emulated/0/Android/obb/<패키지>/main…obb: open failed: ENOENT". 로그 태그 `MuseDashAssistant`(v1.0.3에서 추가)에 스택이 남는다.
+   - 원인: Android 11+에서 다른 앱의 `Android/obb/<패키지>/`는 '출처를 알 수 없는 앱 설치'(appop `REQUEST_INSTALL_PACKAGES`)를 허용받은 앱만 만들고 쓸 수 있다. `MANAGE_EXTERNAL_STORAGE`만으로는 안 된다. 허용 전엔 `mkdirs()`가 조용히 false를 돌려주고 쓰기가 `ENOENT`로 끝난다. v1.0.2까지는 이 권한을 OBB를 다 푼 **뒤** APK 설치 단계에서야 물어서, 이 기기(허용 안 함 상태)에선 한 번도 성공할 수 없었다.
+   - 해결: `installPackage`가 XAPK면 먼저 `canRequestPackageInstalls()`를 보고, 없으면 설정 화면(`ACTION_MANAGE_UNKNOWN_APP_SOURCES`)을 띄우고 멈춘다. 허용 뒤 [설치]를 다시 누르면 진행. OBB 폴더를 못 만들면 그 이유를 토스트로 알린다.
+   - 이 설정은 휴대폰 보안 설정이라 에이전트가 adb `appops`로 켜지 않고 사용자가 켠다.
+   - **실기 확인 (2026-11-01, 사용자가 허용을 켠 뒤)**: OBB 두 개(4.3 GB)를 약 1분에 배치. 설치 뒤 게임 실행·캐시 복원까지 정상(#13 수정 후).
+13. **XAPK [설치] 뒤 설치 화면 대신 파일 관리자(헥스 뷰어)가 열림 (2026-11-01 해결, 실기)**:
+   - 원인: APK를 `ACTION_VIEW` + `application/vnd.android.package-archive`로 넘겼는데, 이 폰은 그 기본 앱이 FV 파일 관리자의 HexViewerActivity였다(`pm resolve-activity`로 확인). 사용자 기기의 '기본 앱' 설정에 따라 설치가 안 될 수 있었다.
+   - 해결: `ACTION_INSTALL_PACKAGE`를 받는 **시스템 앱**(`queryIntentActivities(..., MATCH_SYSTEM_ONLY)`, 이 기기에선 `com.google.android.packageinstaller` 하나)으로 `setPackage`를 못박는다. 이후 [설치] → 시스템 설치 창 → 설치 완료(`installerPackageName=com.google.android.packageinstaller`).
+   - 비서 앱이 미리 만든 `Android/obb/<패키지>/` 파일(소유자 = 비서 앱 uid)은 게임이 설치되는 순간 게임 uid로 바뀌어 게임이 읽을 수 있다(실측).
