@@ -12,7 +12,24 @@
 
 [기능 명세](#-핵심-기능) • [스크린샷](#-스크린샷) • [빌드 및 배포](#-빌드-및-배포-가이드) • [아키텍처](#-아키텍처-및-기술-특징) • [크레딧](#-author--credits)
 
+**[📥 최신 APK 다운로드](https://github.com/magjangin/muse-dash-app-support-tool/releases/latest)**
+
 </div>
+
+---
+
+## 📥 설치 및 문서
+
+1. [Releases](https://github.com/magjangin/muse-dash-app-support-tool/releases/latest)에서 APK를 받아 설치합니다.
+2. 앱에서 **모든 파일에 대한 접근**을 허용합니다.
+3. Android 11 이상이면 설정 탭 맨 위에 🔗 **게임 연동됨**이 뜨는지 확인합니다. ⚠️가 뜨면 PC에서 adb 명령을 한 번 실행해야 합니다.
+
+| 문서 | 내용 |
+|---|---|
+| [설치 가이드](docs/INSTALL.md) | APK 설치, 권한, 게임 설정 연동(adb 1회) |
+| [사용 설명서](docs/USAGE.md) | 탭별 기능, 토글과 `config.txt` 키, 파일 위치 |
+| [문제 해결](docs/TROUBLESHOOTING.md) | 설정 미반영, 곡 미표시, adb 버전 충돌 등 |
+| [변경 이력](CHANGELOG.md) | 버전별 변경 사항 |
 
 ---
 
@@ -38,7 +55,8 @@
 ## ✨ 핵심 기능
 
 ### 1. ⚙️ 모드 설정 실시간 제어 (Config Manager)
-* `config.txt`를 실시간으로 파싱하고 즉시 동기화 저장합니다.
+* `config.txt`를 실시간으로 파싱하고, 토글을 바꾸는 즉시 저장합니다. 게임은 플레이 중에도 1초 안에 반영합니다.
+* 설정 탭 맨 위에 게임 연동 상태(🔗 / ⚠️)를 표시합니다. 자세한 내용은 [설치 가이드](docs/INSTALL.md#3-게임-설정-연동-android-11-이상-기기당-1회)를 보세요.
 * **플레이 보조 옵션**:
   * 🛌 **오토플레이 (`autoPlay`)**: 수면 린 베개 모션 기반 완전 자동 연주
   * ✨ **강제퍼펙트 (`forcePerfect`)**: 타격 판정을 무조건 Perfect로 승격 (All Perfect 파라미터 조작)
@@ -89,6 +107,18 @@ adb shell appops set com.hwa.musedash.assistant MANAGE_EXTERNAL_STORAGE allow
 
 # 4. 앱 실행
 adb shell monkey -p com.hwa.musedash.assistant -c android.intent.category.LAUNCHER 1
+
+# 5. (Android 11+, 기기당 1회) 게임이 공용 config.txt를 읽을 수 있게 소유 앱 지정
+adb shell "content update --uri content://media/external/file --bind owner_package_name:s:com.prpr.musedash.mod --where \"_data='/storage/emulated/0/MuseDash/config.txt'\""
+```
+
+### 릴리스 만들기
+```powershell
+# 1. src/main/AndroidManifest.xml의 versionCode / versionName을 올리고 CHANGELOG.md 작성
+# 2. 빌드 후 버전이 붙은 이름으로 GitHub 릴리스에 업로드
+python build_apk.py
+Copy-Item build\bin\MuseDash_Mod_Assistant.apk build\bin\MuseDash_Mod_Assistant-v1.0.1.apk
+gh release create v1.0.1 build\bin\MuseDash_Mod_Assistant-v1.0.1.apk --title "v1.0.1" --notes-file <릴리스 노트 파일>
 ```
 
 ---
