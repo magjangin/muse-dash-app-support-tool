@@ -68,7 +68,11 @@ nox_adb -s R3CR10T2JFA shell appops set com.hwa.musedash.assistant MANAGE_EXTERN
 
 # 4. 앱 실행
 nox_adb -s R3CR10T2JFA shell monkey -p com.hwa.musedash.assistant -c android.intent.category.LAUNCHER 1
+
+# 5. (기기당 1회) 공용 config.txt 소유자를 게임으로 지정 — 이게 없으면 게임이 설정 토글을 못 읽음 (Dead End #9)
+nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file --bind owner_package_name:s:com.prpr.musedash.mod --where \"_data='/storage/emulated/0/MuseDash/config.txt'\""
 ```
+- PC에 Nox가 떠 있으면 `nox_adb`(서버 v36)가 계속 adb 서버를 재시작하므로, 플랫폼툴 `adb`(v41) 대신 반드시 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`를 쓴다 (버전 충돌로 `device not found` 발생).
 
 ---
 
@@ -103,3 +107,13 @@ nox_adb -s R3CR10T2JFA shell monkey -p com.hwa.musedash.assistant -c android.int
      - 비서 앱(`AndroidBridge.java`)에 `syncSongsToGameDataDir()` 자동 동기화 엔진 탑재.
      - 앱 시작, 곡 목록 스캔(`scanCustomSongs`), 곡 다운로드 완료, 곡 삭제 시 공용 경로와 앱 격리 경로 간의 양방향 미러링을 자동 수행.
      - 유효 곡(`MARENOIA`, `korea`, `summertime`) 3곡이 항상 게임 격리 경로에 유지되어 인게임 앨범 태그 아이콘이 절대로 사라지지 않도록 원천 보장.
+   - 주의 (2026-10-31 실측): 게임 격리 경로 `files/hwa/` 아래 곡 파일은 전부 `shell` 소유였다. 즉 실제로는 adb로 배치된 것이고, 비서 앱의 미러링이 Android 15에서 성공한다는 증거는 없다 (#5, #9와 같은 원인일 가능성이 큼).
+9. **설정 토글이 유지되지 않고 게임에 반영되지 않던 버그 (2026-10-31 해결, 실기 검증 완료)**:
+   - 원인 1 (유지 안 됨): 토글은 [설정 저장]을 눌러야만 파일에 기록됐고, `onAppResume`이 앱 복귀 때마다 파일을 다시 읽어 저장 안 한 토글을 원래 값으로 덮었다.
+     - 해결: 토글 `change` 시 즉시 자동 저장. [기본값]도 즉시 저장.
+   - 원인 2 (게임 미반영): `mod.js`의 `src/config.ts`는 공용 `/MuseDash/config.txt`가 **읽히면** 그걸 쓰고, 아니면 `Android/data/.../save custom key/config.txt`로 폴백한다 (1초마다 내용 변경 감지 → 재시작 없이 실시간 반영). `mod.log`의 `config-loaded.source`가 항상 폴백 경로였다.
+     - 게임은 targetSdk 36이고 `MANAGE_EXTERNAL_STORAGE`를 선언하지 않아, 공용 저장소의 남이 만든 비미디어 파일(.txt, MediaStore `media_type=6`)은 못 읽는다. 비서 앱은 반대로 게임의 `Android/data`에 못 쓴다 (`saveConfig`가 그 예외를 삼켜서 성공 토스트만 뜸).
+     - 해결: MediaStore에서 공용 `config.txt`의 `owner_package_name`을 `com.prpr.musedash.mod`로 바꾸면 FUSE가 게임에 소유자 권한을 준다. 비서 앱은 MANAGE 권한으로 계속 쓸 수 있다. (빌드/배포 5번 명령, 기기당 1회)
+     - **설계 제약**: 비서 앱은 공용 `config.txt`를 절대 삭제·재생성하지 않고 truncate 덮어쓰기만 한다. 재생성하면 소유자가 비서 앱으로 바뀌어 게임이 다시 못 읽는다. 소유 상태는 `AndroidBridge.getConfigStatus()`가 MediaStore를 조회해 설정 탭 상단에 표시한다 (연동 안 되면 위 adb 명령을 안내).
+     - 저장 시 앱이 모르는 키(지연·오프셋 등)와 주석을 보존하도록, 원본 텍스트에서 해당 키 줄만 교체한다.
+   - 실패한 시도: `appops set com.prpr.musedash.mod MANAGE_EXTERNAL_STORAGE allow`는 게임이 권한을 매니페스트에 선언하지 않아 `default`에서 바뀌지 않음 (효과 없음).

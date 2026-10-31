@@ -2,9 +2,11 @@ package com.hwa.musedash.assistant;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
@@ -34,6 +36,7 @@ public class AndroidBridge {
     private static final String PUBLIC_CONFIG = "/storage/emulated/0/MuseDash/config.txt";
     private static final String DOWNLOAD_DIR = "/storage/emulated/0/Download";
     private static final String MOD_PACKAGE = "com.prpr.musedash.mod";
+    private static final String GAME_CONFIG_DIR = "/storage/emulated/0/Android/data/" + MOD_PACKAGE + "/files/save custom key";
 
     public AndroidBridge(MainActivity activity) {
         this.activity = activity;
@@ -79,7 +82,7 @@ public class AndroidBridge {
     public String loadConfig() {
         File cfg = new File(PUBLIC_CONFIG);
         if (!cfg.exists()) {
-            File fallback = new File("/storage/emulated/0/Android/data/" + MOD_PACKAGE + "/files/save custom key/config.txt");
+            File fallback = new File(GAME_CONFIG_DIR, "config.txt");
             if (fallback.exists()) cfg = fallback;
         }
 
@@ -99,33 +102,68 @@ public class AndroidBridge {
         return sb.toString();
     }
 
+    // 반환: {"ok":bool, "mirrored":bool, "owner":String|null, "gameReadable":bool, "error":String}
+    // 게임(targetSdk 36)은 공용 config.txt를 MediaStore 소유자가 자기 자신일 때만 읽을 수 있다.
+    // 그래서 공용 파일은 절대 삭제/재생성하지 않고 덮어쓰기(truncate)만 한다. 재생성하면 소유자가 비서 앱으로 바뀌어 게임이 다시 못 읽는다.
     @JavascriptInterface
-    public boolean saveConfig(String text) {
+    public String saveConfig(String text) {
+        JSONObject res = new JSONObject();
         try {
-            File dir = new File(PUBLIC_DIR);
-            if (!dir.exists()) dir.mkdirs();
+            try {
+                File dir = new File(PUBLIC_DIR);
+                if (!dir.exists()) dir.mkdirs();
 
-            File cfg = new File(PUBLIC_CONFIG);
-            try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(cfg, false), StandardCharsets.UTF_8)) {
-                writer.write(text);
-                writer.flush();
+                File cfg = new File(PUBLIC_CONFIG);
+                try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(cfg, false), StandardCharsets.UTF_8)) {
+                    writer.write(text);
+                    writer.flush();
+                }
+                res.put("ok", true);
+            } catch (Exception e) {
+                res.put("ok", false);
+                res.put("error", String.valueOf(e.getMessage()));
             }
 
-            File fallbackDir = new File("/storage/emulated/0/Android/data/" + MOD_PACKAGE + "/files/save custom key");
+            // Android 11+에서는 다른 앱의 Android/data 쓰기가 막혀 대부분 실패한다 (Dead End #5). 되는 기기에서만 보조 반영.
+            boolean mirrored = false;
+            File fallbackDir = new File(GAME_CONFIG_DIR);
             if (fallbackDir.exists()) {
                 File fbCfg = new File(fallbackDir, "config.txt");
                 try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(fbCfg, false), StandardCharsets.UTF_8)) {
                     writer.write(text);
                     writer.flush();
+                    mirrored = true;
                 } catch (Exception ignored) {}
             }
+            res.put("mirrored", mirrored);
+            putOwnerStatus(res);
+        } catch (Exception ignored) {}
+        return res.toString();
+    }
 
-            showToast("설정 파일이 성공적으로 저장되었습니다!");
-            return true;
-        } catch (Exception e) {
-            showToast("저장 실패: " + e.getMessage());
-            return false;
-        }
+    // 반환: {"exists":bool, "owner":String|null, "gameReadable":bool}
+    @JavascriptInterface
+    public String getConfigStatus() {
+        JSONObject res = new JSONObject();
+        try {
+            res.put("exists", new File(PUBLIC_CONFIG).exists());
+            putOwnerStatus(res);
+        } catch (Exception ignored) {}
+        return res.toString();
+    }
+
+    private void putOwnerStatus(JSONObject res) throws Exception {
+        String owner = queryOwnerPackage(PUBLIC_CONFIG);
+        res.put("owner", owner == null ? JSONObject.NULL : owner);
+        res.put("gameReadable", MOD_PACKAGE.equals(owner));
+    }
+
+    private String queryOwnerPackage(String path) {
+        Uri uri = MediaStore.Files.getContentUri("external");
+        try (Cursor c = activity.getContentResolver().query(uri, new String[]{"owner_package_name"}, "_data=?", new String[]{path}, null)) {
+            if (c != null && c.moveToFirst()) return c.getString(0);
+        } catch (Exception ignored) {}
+        return null;
     }
 
     @JavascriptInterface
