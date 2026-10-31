@@ -107,7 +107,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
      - 비서 앱(`AndroidBridge.java`)에 `syncSongsToGameDataDir()` 자동 동기화 엔진 탑재.
      - 앱 시작, 곡 목록 스캔(`scanCustomSongs`), 곡 다운로드 완료, 곡 삭제 시 공용 경로와 앱 격리 경로 간의 양방향 미러링을 자동 수행.
      - 유효 곡(`MARENOIA`, `korea`, `summertime`) 3곡이 항상 게임 격리 경로에 유지되어 인게임 앨범 태그 아이콘이 절대로 사라지지 않도록 원천 보장.
-   - 주의 (2026-10-31 실측): 게임 격리 경로 `files/hwa/` 아래 곡 파일은 전부 `shell` 소유였다. 즉 실제로는 adb로 배치된 것이고, 비서 앱의 미러링이 Android 15에서 성공한다는 증거는 없다 (#5, #9와 같은 원인일 가능성이 큼).
+   - **정정 (2026-10-31 실측)**: 이 미러링은 Android 15에서 동작하지 않는다. 게임 격리 경로 `files/hwa/` 아래 곡 파일은 전부 `shell` 소유(adb로 넣은 것)였고, 앱으로 받은 곡은 그 경로에 생기지 않았다. 실제 해결은 #10.
 9. **설정 토글이 유지되지 않고 게임에 반영되지 않던 버그 (2026-10-31 해결, 실기 검증 완료)**:
    - 원인 1 (유지 안 됨): 토글은 [설정 저장]을 눌러야만 파일에 기록됐고, `onAppResume`이 앱 복귀 때마다 파일을 다시 읽어 저장 안 한 토글을 원래 값으로 덮었다.
      - 해결: 토글 `change` 시 즉시 자동 저장. [기본값]도 즉시 저장.
@@ -117,3 +117,13 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
      - **설계 제약**: 비서 앱은 공용 `config.txt`를 절대 삭제·재생성하지 않고 truncate 덮어쓰기만 한다. 재생성하면 소유자가 비서 앱으로 바뀌어 게임이 다시 못 읽는다. 소유 상태는 `AndroidBridge.getConfigStatus()`가 MediaStore를 조회해 설정 탭 상단에 표시한다 (연동 안 되면 위 adb 명령을 안내).
      - 저장 시 앱이 모르는 키(지연·오프셋 등)와 주석을 보존하도록, 원본 텍스트에서 해당 키 줄만 교체한다.
    - 실패한 시도: `appops set com.prpr.musedash.mod MANAGE_EXTERNAL_STORAGE allow`는 게임이 권한을 매니페스트에 선언하지 않아 `default`에서 바뀌지 않음 (효과 없음).
+10. **앱으로 받은 커스텀 곡이 게임에 안 들어가던 버그 (2026-10-31 해결, 실기 검증 완료)**:
+   - 원인: 게임은 `[files/hwa, /MuseDash/hwa]` 순서로 `opendir`한다. 공용 `/MuseDash/hwa`는 목록은 보이지만(폴더 이름은 `hwa-skip`으로 찍힘), 안의 파일은 MediaStore 소유자가 비서 앱이라 FUSE가 게임에 숨긴다(`manifest:null, bms:null`). 비서 앱은 `files/hwa`에 못 쓴다(#5). 결국 곡이 게임에 들어갈 길이 없었다.
+   - 실패한 시도: 앱에서 `ContentResolver.update(Files, owner_package_name=게임)` → 0행 갱신. MediaProvider가 shell/system 외에는 소유자 변경을 무시한다. (config.txt는 adb `content update`로만 가능, #9)
+   - 해결 (두 저장소에 걸친 변경):
+     - 비서 앱 `SongProvider` (`content://com.hwa.musedash.assistant.songs`): `/list`는 `/MuseDash/hwa` 아래 파일의 (path, size, mtime), `/file/<경로>`는 읽기 전용 파일. `exported=false` + `grantUriPermissions=true`로 두고, `SongProvider.grantToGame()`이 게임에 prefix URI 읽기 권한을 준다.
+     - 권한을 주는 시점: `MainActivity.onCreate`, `onResume`, `launchGame`. **게임을 `am force-stop` 하거나 재부팅하면 URI 권한이 사라진다** (실측: 강제 종료 뒤 재실행 시 `Permission Denial ... not exported`). 그래서 비서 앱이 앞에 올 때마다 다시 준다. URI 권한이 패키지 가시성도 함께 열어 줘서, 게임(targetSdk 36)의 매니페스트에 `<queries>`가 없어도 provider를 찾는다.
+     - 게임 쪽: `muse-dash-phone/mod/src/hwa/assistant.ts`의 `pullFromAssistant()`를 `loadLibrary()` 맨 앞에서 호출. `frida-java-bridge`로 provider를 읽어, 크기가 다른 파일만 `files/hwa`로 복사한다. 가져온 곡 폴더에는 `.from_assistant` 마커를 남긴다. 목록에서 사라진 곡은 마커가 있는 폴더만 지우고, adb로 넣은 곡은 건드리지 않는다. provider를 못 읽으면 아무것도 지우지 않고 기존 곡으로 진행한다.
+     - 곡은 게임 **시작 시에만** 가져온다. 게임이 켜져 있으면 완전히 껐다 켜야 반영된다.
+   - 검증 로그 (`mod.log`): `{"t":"assistant-sync","songs":4,"files":2507,"copied":633,"failed":0,"removed":0}` → `hwa-library count:4` (`매칭앱 프린세스`가 `files/hwa`에서 로드됨). 더미 폴더를 추가하자 `copied:1`, 지우자 `removed:1`을 확인했다.
+   - **아이콘은 건드리지 않는다 (사용자 지시)**: `hwa_tag_icon.png`와 앱 런처 아이콘, 그리고 아이콘 관련 코드(`syncSongsToGameDataDir`의 아이콘 복사 부분 포함)는 수정·이동·덮어쓰기하지 않는다. 문서에도 아이콘을 복사하는 명령을 넣지 않는다.

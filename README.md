@@ -26,7 +26,7 @@
 
 | 문서 | 내용 |
 |---|---|
-| [설치 가이드](docs/INSTALL.md) | APK 설치, 권한, 게임 설정 연동(adb 1회) |
+| [설치 가이드](docs/INSTALL.md) | APK 설치, 권한, 게임 설정 연동(adb 1회), mod.js 최신화 |
 | [사용 설명서](docs/USAGE.md) | 탭별 기능, 토글과 `config.txt` 키, 파일 위치 |
 | [문제 해결](docs/TROUBLESHOOTING.md) | 설정 미반영, 곡 미표시, adb 버전 충돌 등 |
 | [변경 이력](CHANGELOG.md) | 버전별 변경 사항 |
@@ -71,11 +71,11 @@
 * 다단계 HTTP 리다이렉트(308 ➔ 307 Cloudflare R2 스토리지) 자동 추적 엔진 탑재.
 * ZIP 패키지 다운로드 즉시 차트, BGM 음원, 자켓 이미지를 디스크에 자동 압축 해제 및 적재.
 
-### 3. 🔄 Android 15 Scoped Storage 자동 양방향 동기화
-* Android 15의 엄격해진 앱 격리 스토리지 정책으로 인해 게임 libc의 공용 폴더(`EACCES`) 접근이 차단되는 문제를 원천 해결.
-* **Auto-Sync Engine**:
-  * 비서 앱이 공용 경로(`/sdcard/MuseDash/hwa/`)와 게임 내부 격리 경로(`/Android/data/com.prpr.musedash.mod/files/hwa/`)를 실시간 양방향 미러링.
-  * 유효 곡 목록과 커스텀 앨범 태그 아이콘(`hwa_tag_icon.png`)이 게임 격리 경로에 항상 유지되어, **인게임 앨범 아이콘이 소멸되는 현상을 100% 방지**.
+### 3. 🔄 Android 11+ 곡 전달 (SongProvider)
+* Android 11 이상에서는 비서 앱이 게임의 `Android/data` 폴더에 쓸 수 없고, 게임도 비서 앱이 받은 공용 파일을 읽을 수 없습니다.
+* 비서 앱이 `/sdcard/MuseDash/hwa/`를 **읽기 전용 ContentProvider로 게임에게만** 열어 둡니다.
+* 게임이 시작될 때 모드(`mod.js`)가 목록을 받아 새 파일만 게임 전용 폴더로 복사하고, 비서 앱에서 지운 곡은 게임 폴더에서도 지웁니다.
+* 곡 가져오기를 지원하는 [muse-dash-phone](https://github.com/magjangin/muse-dash-phone) `mod.js`가 필요합니다. 자세한 내용은 [사용 설명서](docs/USAGE.md#곡이-게임에-들어가는-방식)를 보세요.
 
 ### 4. 📦 XAPK / APK 패키지 인스톨러 (XAPK Manager)
 * 다운로드 폴더 내의 `.xapk` / `.apk` 파일 자동 스캔.
@@ -117,8 +117,8 @@ adb shell "content update --uri content://media/external/file --bind owner_packa
 # 1. src/main/AndroidManifest.xml의 versionCode / versionName을 올리고 CHANGELOG.md 작성
 # 2. 빌드 후 버전이 붙은 이름으로 GitHub 릴리스에 업로드
 python build_apk.py
-Copy-Item build\bin\MuseDash_Mod_Assistant.apk build\bin\MuseDash_Mod_Assistant-v1.0.1.apk
-gh release create v1.0.1 build\bin\MuseDash_Mod_Assistant-v1.0.1.apk --title "v1.0.1" --notes-file <릴리스 노트 파일>
+Copy-Item build\bin\MuseDash_Mod_Assistant.apk build\bin\MuseDash_Mod_Assistant-v1.0.2.apk
+gh release create v1.0.2 build\bin\MuseDash_Mod_Assistant-v1.0.2.apk --title "v1.0.2" --notes-file <릴리스 노트 파일>
 ```
 
 ---
@@ -132,7 +132,7 @@ gh release create v1.0.1 build\bin\MuseDash_Mod_Assistant-v1.0.1.apk --title "v1
    │
    ├── Native Bridge: AndroidBridge.java
    │      ├── Config IO: /sdcard/MuseDash/config.txt
-   │      ├── Sync Engine: Public (/sdcard/MuseDash/hwa/) ↔ Scoped (/Android/data/.../hwa/)
+   │      ├── SongProvider: /sdcard/MuseDash/hwa/ 를 게임에게만 읽기 전용으로 공개 (mod.js가 시작 시 가져감)
    │      ├── Network Downloader: Multi-hop Redirect Stream Unzipper
    │      └── Package Engine: GenericFileProvider APK/XAPK Installer
    │

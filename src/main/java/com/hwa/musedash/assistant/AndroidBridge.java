@@ -764,6 +764,7 @@ public class AndroidBridge {
             try {
                 Intent launchIntent = act.getPackageManager().getLaunchIntentForPackage(MOD_PACKAGE);
                 if (launchIntent != null) {
+                    SongProvider.grantToGame(act);
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                     act.startActivity(launchIntent);
                     Toast.makeText(act, "뮤즈대시 모드를 실행합니다! 🎮", Toast.LENGTH_SHORT).show();

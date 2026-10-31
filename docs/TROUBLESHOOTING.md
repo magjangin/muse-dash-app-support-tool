@@ -31,21 +31,23 @@ PC에 Nox 같은 안드로이드 에뮬레이터가 켜져 있으면, 에뮬레�
 - 에뮬레이터를 끄고 다시 시도하거나,
 - 에뮬레이터에 들어 있는 adb를 대신 씁니다. Nox라면 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`입니다.
 
-## 커스텀 곡이 게임에 안 보여요 / 커스텀 앨범 아이콘이 사라졌어요
+## 받은 곡이 게임에 안 보여요
 
-Android 15에서는 게임이 공용 폴더(`/MuseDash/hwa/`)의 곡을 못 읽고, 게임 전용 폴더(`/Android/data/com.prpr.musedash.mod/files/hwa/`)의 곡만 읽습니다.
-게임 전용 폴더가 비어 있으면 커스텀 앨범 아이콘도 숨겨집니다.
+Android 11 이상에서는 게임이 비서 앱이 받은 곡 파일을 직접 읽을 수 없습니다.
+그래서 **게임을 시작할 때** 모드(`mod.js`)가 비서 앱에서 곡을 가져와 게임 전용 폴더로 복사합니다.
 
-비서 앱은 곡을 받거나 지울 때 두 폴더를 맞추려고 시도하지만, Android 11 이상에서는 다른 앱의 `Android/data` 폴더에 쓰기가 막혀 실패할 수 있습니다.
-이럴 때는 PC에서 곡을 게임 전용 폴더로 직접 복사하세요.
-
-```bash
-adb shell "cp -r /storage/emulated/0/MuseDash/hwa/. /storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/"
-```
+1. **게임을 완전히 껐다가** 다시 켜세요. 곡은 게임이 시작될 때만 가져옵니다. 이미 켜져 있던 게임을 앞으로 가져오기만 하면 새 곡이 안 보입니다.
+2. 게임은 비서 앱의 **▶ 뮤즈대시 모드 실행하기**로 켜거나, 비서 앱을 한 번 열었다가 켜세요. 게임을 강제 종료했거나 기기를 재부팅하면 곡을 가져올 권한이 사라지고, 비서 앱이 앞에 나올 때 다시 줍니다.
+3. `mod.js`가 곡 가져오기를 지원하는 버전인지 확인합니다. [설치 가이드 4번](INSTALL.md#4-모드-modjs-최신화)을 보세요.
+4. 그래도 안 되면 게임 로그를 확인합니다.
 
 ```bash
-adb shell "cp /storage/emulated/0/MuseDash/hwa_tag_icon.png /storage/emulated/0/Android/data/com.prpr.musedash.mod/files/"
+adb shell "grep -a assistant-sync /storage/emulated/0/Android/data/com.prpr.musedash.mod/files/mod.log | tail -3"
 ```
+
+- `"t":"assistant-sync"`: 가져오기에 성공했습니다. `copied`는 이번에 복사한 파일 수, `removed`는 지운 곡 수입니다.
+- `"t":"assistant-sync-skip"` + `Permission Denial`: 권한이 없었습니다. 2번처럼 비서 앱을 연 뒤 게임을 다시 켜세요.
+- 로그에 `assistant-sync`가 아예 없음: `mod.js`가 예전 버전입니다. 3번을 보세요.
 
 ## 앱 상단에 "파일 접근 권한 필요"가 계속 떠요
 

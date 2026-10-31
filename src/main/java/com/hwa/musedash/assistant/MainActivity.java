@@ -26,6 +26,7 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new ChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(this), "AndroidBridge");
         webView.loadUrl("file:///android_asset/index.html");
+        SongProvider.grantToGame(this);
     }
 
     static class ChromeClient extends WebChromeClient {
@@ -39,6 +40,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // 게임을 강제 종료하거나 기기를 재부팅하면 URI 권한이 사라지므로, 비서 앱이 앞에 올 때마다 다시 준다.
+        SongProvider.grantToGame(this);
         if (webView != null) {
             webView.evaluateJavascript("if(window.onAppResume) window.onAppResume();", null);
         }

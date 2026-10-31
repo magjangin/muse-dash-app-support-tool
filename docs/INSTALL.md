@@ -8,6 +8,7 @@
 |---|---|
 | 기기 | Android 8.0 이상 (실기 검증: Galaxy S21, Android 15) |
 | 게임 | 뮤즈대시 모드판 `com.prpr.musedash.mod` (v6.8.0) 설치 완료 |
+| 모드 | 곡 가져오기를 지원하는 `mod.js` ([muse-dash-phone](https://github.com/magjangin/muse-dash-phone) 2026-10-31 이후 빌드) |
 | 설정 연동용 (Android 11+) | PC + USB 케이블 + [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools)의 `adb` — 처음 한 번만 필요 |
 
 ## 1. APK 설치
@@ -65,10 +66,22 @@ adb shell "content update --uri content://media/external/file --bind owner_packa
 > 이 연결은 `config.txt` 파일이 지워지지 않는 한 계속 유지됩니다.
 > 파일 관리자로 `MuseDash/config.txt`를 지웠거나 기기를 초기화했다면 위 명령을 다시 실행하세요.
 
-## 4. 동작 확인
+## 4. 모드 (mod.js) 최신화
+
+비서 앱에서 받은 곡은 게임이 시작될 때 모드가 가져갑니다. 이 기능은 2026-10-31 이후의 `mod.js`에만 있습니다.
+[muse-dash-phone 릴리스](https://github.com/magjangin/muse-dash-phone/releases/latest)에서 `mod.js`를 받아 게임 폴더에 덮어씁니다.
+
+```bash
+adb push mod.js /sdcard/Android/data/com.prpr.musedash.mod/files/mod.js
+```
+
+> 게임을 다시 설치할 필요는 없습니다. `mod.js` 파일만 바꾸면 됩니다.
+
+## 5. 동작 확인
 
 1. 설정 탭에서 원하는 토글을 바꿉니다. 바꾸는 즉시 저장되며, 따로 [설정 저장]을 누를 필요가 없습니다.
-2. 내 곡 탭에서 **▶ 뮤즈대시 모드 실행하기**를 누릅니다.
-3. 게임 플레이 중에도 비서 앱에서 토글을 바꾸면 1초 안에 반영됩니다. 게임을 다시 시작할 필요가 없습니다.
+2. hwa.moe 탭에서 곡을 **⬇️ 주입**합니다.
+3. 게임이 켜져 있었다면 완전히 끄고, 내 곡 탭에서 **▶ 뮤즈대시 모드 실행하기**를 누릅니다. 게임이 시작되면서 새 곡을 가져옵니다.
+4. 게임 플레이 중에도 비서 앱에서 토글을 바꾸면 1초 안에 반영됩니다. 게임을 다시 시작할 필요가 없습니다.
 
 문제가 생기면 [문제 해결](TROUBLESHOOTING.md)을 보세요.
