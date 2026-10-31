@@ -2,6 +2,7 @@ package com.hwa.musedash.assistant;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -25,6 +26,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -213,22 +215,29 @@ public class AndroidBridge {
                 bridge.showToast("XAPK 분석 및 패키지 추출 중...");
                 File cacheDir = bridge.activity.getCacheDir();
                 File extractedApk = new File(cacheDir, "extracted_base.apk");
-                File obbDestDir = new File("/storage/emulated/0/Android/obb/" + MOD_PACKAGE);
-
-                if (!obbDestDir.exists()) {
-                    obbDestDir.mkdirs();
-                }
+                // OBB 위치는 XAPK의 manifest.json(package_name)과 항목 경로(Android/obb/<패키지>/...)를 따른다.
+                // 모드 XAPK는 manifest.json이 첫 항목이다. 없으면 기본 모드 패키지로 둔다.
+                String targetPackage = MOD_PACKAGE;
 
                 boolean foundApk = false;
-                boolean copiedObb = false;
+                int copiedObb = 0;
+                int keptObb = 0;
 
-                try (ZipInputStream zis = new ZipInputStream(new FileInputStream(file))) {
+                try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(file), 1 << 20))) {
                     ZipEntry entry;
-                    byte[] buffer = new byte[65536];
+                    byte[] buffer = new byte[1 << 20];
                     while ((entry = zis.getNextEntry()) != null) {
                         String entryName = entry.getName();
 
-                        if (entryName.endsWith(".apk") && (!foundApk || entryName.contains("base") || entryName.contains("musedash"))) {
+                        if (entryName.equals("manifest.json")) {
+                            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                            int read;
+                            while ((read = zis.read(buffer)) != -1) {
+                                bos.write(buffer, 0, read);
+                            }
+                            String pkg = new JSONObject(new String(bos.toByteArray(), StandardCharsets.UTF_8)).optString("package_name", "");
+                            if (pkg.matches("[A-Za-z0-9_.]+")) targetPackage = pkg;
+                        } else if (entryName.endsWith(".apk") && (!foundApk || entryName.contains("base") || entryName.contains("musedash"))) {
                             try (FileOutputStream fos = new FileOutputStream(extractedApk)) {
                                 int read;
                                 while ((read = zis.read(buffer)) != -1) {
@@ -237,15 +246,29 @@ public class AndroidBridge {
                             }
                             foundApk = true;
                         } else if (entryName.endsWith(".obb")) {
-                            String obbName = new File(entryName).getName();
-                            File obbTarget = new File(obbDestDir, obbName);
-                            try (FileOutputStream fos = new FileOutputStream(obbTarget)) {
-                                int read;
-                                while ((read = zis.read(buffer)) != -1) {
-                                    fos.write(buffer, 0, read);
-                                }
+                            File obbTarget;
+                            if (entryName.startsWith("Android/obb/") && !entryName.contains("..")) {
+                                obbTarget = new File("/storage/emulated/0/" + entryName);
+                            } else {
+                                obbTarget = new File("/storage/emulated/0/Android/obb/" + targetPackage, new File(entryName).getName());
                             }
-                            copiedObb = true;
+                            // 이미 같은 크기로 있으면 건너뛴다 (다시 설치할 때 4GB를 또 쓰지 않게). 중간에 끊긴 파일은 크기가 달라 다시 쓴다.
+                            if (entry.getSize() >= 0 && obbTarget.length() == entry.getSize()) {
+                                keptObb++;
+                            } else {
+                                File parent = obbTarget.getParentFile();
+                                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                                    throw new java.io.IOException("OBB 폴더를 만들 수 없습니다 (" + parent.getPath() + "). '알 수 없는 앱 설치' 허용을 확인해 주세요.");
+                                }
+                                bridge.showToast("OBB 배치 중: " + obbTarget.getName() + " (수 분 걸릴 수 있습니다)");
+                                try (FileOutputStream fos = new FileOutputStream(obbTarget)) {
+                                    int read;
+                                    while ((read = zis.read(buffer)) != -1) {
+                                        fos.write(buffer, 0, read);
+                                    }
+                                }
+                                copiedObb++;
+                            }
                         }
                         zis.closeEntry();
                     }
@@ -253,13 +276,14 @@ public class AndroidBridge {
 
                 if (foundApk) {
                     String msg = "APK 추출 완료!";
-                    if (copiedObb) msg += " (OBB 배치 완료)";
+                    if (copiedObb + keptObb > 0) msg += " (OBB " + (copiedObb + keptObb) + "개 배치 완료)";
                     bridge.showToast(msg);
                     bridge.installApkFile(extractedApk);
                 } else {
                     bridge.showToast("XAPK 내에서 APK 파일을 찾지 못했습니다.");
                 }
             } catch (Exception e) {
+                android.util.Log.w("MuseDashAssistant", "XAPK extract failed", e);
                 bridge.showToast("XAPK 처리 중 오류: " + e.getMessage());
             }
         }
@@ -278,7 +302,32 @@ public class AndroidBridge {
             return;
         }
 
+        // Android 11+에서는 '알 수 없는 앱 설치'를 허용받은 앱만 다른 앱의 Android/obb/<패키지>에 쓸 수 있다.
+        // 허용 전엔 폴더 생성이 조용히 실패하고 OBB 쓰기가 ENOENT로 끝난다(2026-11-01 실측). 그래서 압축을 풀기 전에 묻는다.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !activity.getPackageManager().canRequestPackageInstalls()) {
+            activity.runOnUiThread(new RequestInstallPermissionTask(activity));
+            return;
+        }
+
         new Thread(new XapkExtractTask(this, file)).start();
+    }
+
+    static class RequestInstallPermissionTask implements Runnable {
+        final MainActivity act;
+
+        RequestInstallPermissionTask(MainActivity act) {
+            this.act = act;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Intent reqIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                reqIntent.setData(Uri.parse("package:" + act.getPackageName()));
+                act.startActivity(reqIntent);
+            } catch (Exception ignored) {}
+            Toast.makeText(act, "XAPK 설치에는 '알 수 없는 앱 설치' 허용이 필요합니다. 허용한 뒤 [설치]를 다시 눌러 주세요.", Toast.LENGTH_LONG).show();
+        }
     }
 
     static class InstallApkTask implements Runnable {
@@ -308,6 +357,12 @@ public class AndroidBridge {
                 intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                // 'APK 열기' 기본 앱이 파일 관리자로 잡힌 폰에선 설치 대신 그 앱이 열린다(2026-11-01 실측: FV 헥스 뷰어).
+                // 설치 요청(INSTALL_PACKAGE)을 받는 시스템 앱 = 시스템 설치기로 받을 곳을 못박는다.
+                Intent probe = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+                probe.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                List<ResolveInfo> installers = act.getPackageManager().queryIntentActivities(probe, PackageManager.MATCH_SYSTEM_ONLY);
+                if (!installers.isEmpty()) intent.setPackage(installers.get(0).activityInfo.packageName);
                 act.startActivity(intent);
             } catch (Exception e) {
                 Toast.makeText(act, "설치 실행 실패: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -321,7 +376,6 @@ public class AndroidBridge {
 
     @JavascriptInterface
     public String scanCustomSongs() {
-        // 게임 경로와 실시간 동기화
         syncSongsToGameDataDir();
 
         JSONArray arr = new JSONArray();
@@ -418,36 +472,11 @@ public class AndroidBridge {
         } catch (Throwable ignored) {}
     }
 
+    // 곡은 여기서 게임 폴더로 옮기지 않는다. Android 11+에서는 남의 Android/data에 못 써서 미러링이 동작하지 않았고
+    // (AGENTS.md Dead End #8 정정), 게임이 시작할 때 SongProvider로 직접 가져간다(#10). 그 전엔 게임 폴더의
+    // adb로 넣은 곡까지 '공용에 없는 곡'으로 지울 수 있었다. 아래 아이콘 부분은 사용자 지시로 그대로 둔다.
     public void syncSongsToGameDataDir() {
         try {
-            File publicHwa = new File(PUBLIC_DIR + "/hwa");
-            File gameHwa = new File("/storage/emulated/0/Android/data/" + MOD_PACKAGE + "/files/hwa");
-            if (!publicHwa.exists() || !publicHwa.isDirectory()) return;
-
-            // 1. 공용 경로에 있는 유효 곡을 게임 내부 격리 경로로 동기화
-            File[] publicSongs = publicHwa.listFiles();
-            Set<String> validFolders = new HashSet<>();
-            if (publicSongs != null) {
-                for (File ps : publicSongs) {
-                    if (ps.isDirectory()) {
-                        validFolders.add(ps.getName().toLowerCase());
-                        copyDirectory(ps, new File(gameHwa, ps.getName()));
-                    }
-                }
-            }
-
-            // 2. 공용에 없는(삭제된) 곡은 게임 내부 경로에서도 완전 삭제
-            if (gameHwa.exists() && gameHwa.isDirectory()) {
-                File[] gameSongs = gameHwa.listFiles();
-                if (gameSongs != null) {
-                    for (File gs : gameSongs) {
-                        if (gs.isDirectory() && !validFolders.contains(gs.getName().toLowerCase())) {
-                            deleteRecursive(gs);
-                        }
-                    }
-                }
-            }
-
             // 3. 커스텀 태그 아이콘 동기화
             File publicIcon = new File(PUBLIC_DIR + "/hwa_tag_icon.png");
             File gameIcon = new File("/storage/emulated/0/Android/data/" + MOD_PACKAGE + "/files/hwa_tag_icon.png");
@@ -486,9 +515,9 @@ public class AndroidBridge {
                 String searchLower = targetName.toLowerCase().trim();
                 boolean deletedAny = false;
 
+                // 게임 폴더(files/hwa)의 사본은 게임이 다음 시작 때 SongProvider 목록과 맞춰 지운다(.from_assistant 표시가 있는 폴더만).
                 String[] basePaths = new String[]{
-                        PUBLIC_DIR + "/hwa",
-                        "/storage/emulated/0/Android/data/" + MOD_PACKAGE + "/files/hwa"
+                        PUBLIC_DIR + "/hwa"
                 };
 
                 for (String basePath : basePaths) {
@@ -626,23 +655,10 @@ public class AndroidBridge {
                 }
                 if (folderName.isEmpty()) folderName = title.trim();
 
+                // 공용 폴더에만 받는다. 게임은 시작할 때 SongProvider로 이 폴더를 읽어 간다.
                 File publicTargetDir = new File(PUBLIC_DIR + "/hwa/" + folderName);
-                File modTargetDir = new File("/storage/emulated/0/Android/data/" + MOD_PACKAGE + "/files/hwa/" + folderName);
 
                 if (!publicTargetDir.exists()) publicTargetDir.mkdirs();
-
-                boolean canWriteModDir = false;
-                try {
-                    if (modTargetDir.exists() || modTargetDir.mkdirs()) {
-                        File testF = new File(modTargetDir, ".test_write");
-                        if (testF.createNewFile()) {
-                            testF.delete();
-                            canWriteModDir = true;
-                        }
-                    }
-                } catch (Throwable t) {
-                    canWriteModDir = false;
-                }
 
                 HttpURLConnection conn = null;
                 int redirects = 0;
@@ -691,9 +707,6 @@ public class AndroidBridge {
                         String eName = entry.getName();
                         if (entry.isDirectory()) {
                             new File(publicTargetDir, eName).mkdirs();
-                            if (canWriteModDir) {
-                                try { new File(modTargetDir, eName).mkdirs(); } catch (Throwable ignored) {}
-                            }
                         } else {
                             File f1 = new File(publicTargetDir, eName);
                             File p1 = f1.getParentFile();
@@ -703,23 +716,6 @@ public class AndroidBridge {
                                 int read;
                                 while ((read = zis.read(buffer)) != -1) {
                                     fos1.write(buffer, 0, read);
-                                }
-                            }
-
-                            if (canWriteModDir) {
-                                try {
-                                    File f2 = new File(modTargetDir, eName);
-                                    File p2 = f2.getParentFile();
-                                    if (p2 != null && !p2.exists()) p2.mkdirs();
-                                    try (FileInputStream in1 = new FileInputStream(f1);
-                                         FileOutputStream fos2 = new FileOutputStream(f2)) {
-                                        int r;
-                                        while ((r = in1.read(buffer)) != -1) {
-                                            fos2.write(buffer, 0, r);
-                                        }
-                                    }
-                                } catch (Throwable ignored) {
-                                    // Android 11+ Scoped storage blocks writing to other app's data dir
                                 }
                             }
                         }
