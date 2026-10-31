@@ -128,3 +128,8 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
    - 검증 로그 (`mod.log`): `{"t":"assistant-sync","songs":4,"files":2507,"copied":633,"failed":0,"removed":0}` → `hwa-library count:4` (`매칭앱 프린세스`가 `files/hwa`에서 로드됨). 더미 폴더를 추가하자 `copied:1`, 지우자 `removed:1`을 확인했다.
    - **아이콘은 건드리지 않는다 (사용자 지시)**: `hwa_tag_icon.png`와 앱 런처 아이콘, 그리고 아이콘 관련 코드(`syncSongsToGameDataDir`의 아이콘 복사 부분 포함)는 수정·이동·덮어쓰기하지 않는다. 문서에도 아이콘을 복사하는 명령을 넣지 않는다.
    - **mod.js 배포 주의 (2026-10-31 사고)**: 기기에 `muse-dash-phone/mod/dist/mod.js`(공개본)를 올렸더니 캐릭터·아이템 해금(`preserve`/`unlockItems`/`unlockLevels`)이 빠져 사용자가 지적했다. **기기에는 개인 전체판 `build/clone/mod.js`만 올린다.** 공개 릴리스(`muse-dash-phone` v6.8.0)에는 공개본만 올린다 (유료 DLC 해금을 공개 배포하지 않는다는 사용자 결정). 올리기 전에 `grep -c unlockItems mod.js`로 확인할 것.
+11. **고스트노트보이기 토글이 먹통 (2026-10-31 해결, 실기 확인)**:
+   - 원인: 안드로이드 `ghost.ts`가 `battleSong()?.manifest.showGhostNotes === true`만 봤다. 전역 config(`고스트노트보이기`, 비서 앱 토글)를 완전히 무시해서 공식 곡과 설정 없는 커스텀 곡(korea, summertime)에서는 절대 켜지지 않았다. 또 PC 원본(`muse dash test/.../GhostNoteAlphaHold.cs`)에 있던 판마다 캐시 초기화(`ResetCache`, PnlBattle GameStart)가 빠져 있었다.
+   - 해결: PC `GhostNoteVisibility` 규칙 그대로. 곡 `info.txt`에 값이 있으면 그 값, 없으면 `currentConfig.showGhostNotes`. `battleSerial()`이 바뀌면 `opaqueState`만 비운다. `originalAlphas`는 끌 때 되돌리려고 유지한다.
+   - 확인: 공식 곡 플레이 중 `{"t":"ghost-alpha","anim":"in_nor_38","opaque":true}`가 찍혔다 (수정 전에는 공식 곡에서 이 이벤트가 없음). 개인 전체판·공개본 양쪽 `ghost.ts`에 반영했다.
+   - 공개본 동기화: 이때 공개본 `config.ts`(공용 config.txt 읽기)·`customTag.ts`(공용 아이콘 경로 탐색)도 전체판과 맞췄다. 이 세션 전 공개 릴리스는 전체판이라 원래 이 동작이었다. 아이콘 파일 자체는 건드리지 않았다.
