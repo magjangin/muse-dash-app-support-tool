@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>뮤즈대시 모드 비서</title>
+  <style>
+    :root {
+      --bg-primary: #121218;
+      --bg-card: rgba(28, 28, 38, 0.75);
+      --bg-card-hover: rgba(38, 38, 52, 0.85);
+      --accent: #ff2a7a;
+      --accent-glow: rgba(255, 42, 122, 0.35);
+      --cyan: #00e5ff;
+      --cyan-glow: rgba(0, 229, 255, 0.3);
+      --text: #f0f0f5;
+      --text-sub: #9ca0b0;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(255, 42, 122, 0.5);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+      padding: 16px;
+      padding-bottom: 90px;
+      min-height: 100vh;
+      background-image: radial-gradient(circle at 10% 10%, rgba(255, 42, 122, 0.08) 0%, transparent 40%),
+                        radial-gradient(circle at 90% 90%, rgba(0, 229, 255, 0.06) 0%, transparent 40%);
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 18px;
+      color: #fff;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* Tabs */
+    .nav-tabs {
+      display: flex;
+      background: rgba(20, 20, 28, 0.8);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+      gap: 2px;
+    }
+    .nav-tab {
+      flex: 1;
+      padding: 10px 2px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-sub);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .nav-tab.active {
+      background: var(--bg-card-hover);
+      color: var(--text);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Permission banner */
+    .banner-perm {
+      display: none;
+      background: rgba(255, 170, 0, 0.15);
+      border: 1px solid rgba(255, 170, 0, 0.4);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .banner-perm h4 {
+      color: #ffb833;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .banner-perm p {
+      color: #ddd;
+      font-size: 12px;
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+    .btn-perm {
+      background: #ffb833;
+      color: #121218;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Setting Item */
+    .setting-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .setting-item:last-child {
+      border-bottom: none;
+      padding-bottom: 4px;
+    }
+    .setting-info {
+      flex: 1;
+      padding-right: 12px;
+    }
+    .setting-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .setting-desc {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    /* iOS/Avalonia Style Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #2e303d;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    input:checked + .slider {
+      background-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    /* Bottom Action Bar */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(18, 18, 24, 0.92);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.1s ease, filter 0.2s ease;
+    }
+    .btn:active {
+      transform: scale(0.97);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #ff5294);
+      color: white;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+    .btn-secondary {
+      background: #252532;
+      color: var(--text);
+      border: 1px solid var(--border);
+      flex: 0 0 auto;
+      padding: 14px 16px;
+    }
+
+    /* List Items (XAPK / Songs) */
+    .file-item {
+      background: rgba(35, 35, 48, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .file-item.highlight {
+      border-color: var(--cyan);
+      background: rgba(0, 229, 255, 0.06);
+    }
+    .file-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .file-name {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .file-meta {
+      font-size: 11px;
+      color: var(--text-sub);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-xapk {
+      background: rgba(255, 42, 122, 0.2);
+      color: var(--accent);
+    }
+    .badge-apk {
+      background: rgba(0, 229, 255, 0.2);
+      color: var(--cyan);
+    }
+    .badge-diff {
+      background: rgba(255, 170, 0, 0.2);
+      color: #ffb833;
+    }
+    .btn-small {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .btn-small:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Online Album Card */
+    .online-album-card {
+      background: rgba(35, 35, 48, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .album-cover {
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #252532;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+    }
+
+    /* Status Banner */
+    .game-status-card {
+      background: linear-gradient(135deg, rgba(255, 42, 122, 0.15), rgba(0, 229, 255, 0.15));
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .btn-launch {
+      width: 100%;
+      background: linear-gradient(135deg, var(--cyan), #00b0ff);
+      color: #0b141a;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      box-shadow: 0 4px 18px var(--cyan-glow);
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px 10px;
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">MD</div>
+      <div>
+        <div class="brand-title">뮤즈대시 모드 비서</div>
+        <div class="brand-sub">HWA CUSTOM ASSISTANT</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Permission Banner -->
+  <div id="permBanner" class="banner-perm">
+    <h4>⚠️ 파일 접근 권한 필요</h4>
+    <p>Android 11+ 시스템에서 <code>config.txt</code> 수정 및 XAPK 탐색을 위해 '모든 파일에 대한 접근' 권한이 필요합니다.</p>
+    <button class="btn-perm" onclick="requestPermission()">권한 설정 열기</button>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="switchTab('configTab', this)">⚙️ 설정</div>
+    <div class="nav-tab" onclick="switchTab('hwaMoeTab', this)">🌐 hwa.moe</div>
+    <div class="nav-tab" onclick="switchTab('songsTab', this)">🎵 내 곡</div>
+    <div class="nav-tab" onclick="switchTab('xapkTab', this)">📦 XAPK</div>
+  </div>
+
+  <!-- Tab 1: Config Settings -->
+  <div id="configTab" class="tab-content active">
+    <div class="card">
+      <div class="card-title">🎮 플레이 보조 옵션</div>
+      
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-name">오토플레이</div>
+          <div class="setting-desc">수면 린 베개 모션으로 차트를 완전 자동 연주합니다.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cfg_autoplay">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-name">강제퍼펙트 (All Perfect)</div>
+          <div class="setting-desc">타격 판정을 무조건 Perfect로 올립니다.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cfg_forceperfect">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-name">피버충전금지</div>
+          <div class="setting-desc">피버 게이지가 차오르지 않게 고정합니다.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cfg_blockfever">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎬 연출 및 그래픽 옵션</div>
+      
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-name">시네마 (BGA 비디오)</div>
+          <div class="setting-desc">커스텀 곡 배경에 MP4 비디오를 재생합니다.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cfg_cinema">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-name">고스트노트보이기</div>
+          <div class="setting-desc">고스트 노트가 투명해지지 않고 선명하게 보입니다.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cfg_ghostnotes">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Bottom Actions for Config Tab -->
+    <div class="bottom-bar">
+      <button class="btn btn-secondary" onclick="loadConfigFromFile()" title="새로고침">🔄</button>
+      <button class="btn btn-secondary" onclick="resetDefaults()" title="기본값 복원">⚡ 기본값</button>
+      <button class="btn btn-primary" onclick="saveConfigToFile()">💾 설정 저장</button>
+    </div>
+  </div>
+
+  <!-- Tab 2: hwa.moe Online Store -->
+  <div id="hwaMoeTab" class="tab-content">
+    <div class="card">
+      <div class="card-title">
+        <span>🌐 HWA.MOE 커스텀 앨범</span>
+        <button class="btn-small" style="background:#252532; font-size:11px;" onclick="fetchHwaAlbums()">🔄 새로고침</button>
+      </div>
+      <div id="hwaAlbumListContainer">
+        <div class="empty-state">hwa.moe 곡 목록을 불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Custom Songs & Info -->
+  <div id="songsTab" class="tab-content">
+    <div class="game-status-card">
+      <div style="font-size:12px; color:var(--cyan); font-weight:700;">GAME STATUS</div>
+      <div id="gameStatusText" style="font-size:16px; font-weight:700; margin:6px 0;">뮤즈대시 모드 설치 확인됨</div>
+      <button class="btn-launch" onclick="launchGame()">▶ 뮤즈대시 모드 실행하기</button>
+      <div style="font-size:11px; color:#aaa; margin-top:8px;">💡 곡을 추가하거나 삭제한 후 인게임에 바로 안 뜰 때는, 최근 앱에서 게임을 완전히 종료(스와이프) 후 다시 켜주세요.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎵 기기에 등록된 커스텀 곡</div>
+      <div id="songListContainer">
+        <div class="empty-state">곡 목록을 불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 4: XAPK Manager -->
+  <div id="xapkTab" class="tab-content">
+    <div class="card">
+      <div class="card-title">📦 감지된 XAPK / APK 파일</div>
+      <div id="fileListContainer">
+        <div class="empty-state">파일을 검색하는 중...</div>
+      </div>
+      <button class="btn btn-secondary" style="width:100%; margin-top:12px;" onclick="scanFiles()">🔍 다운로드 폴더 다시 검색</button>
+    </div>
+  </div>
+
+  <script>
+    var installedSongsList = [];
+
+    // Tab switching
+    function switchTab(tabId, el) {
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      el.classList.add('active');
+
+      if (tabId === 'hwaMoeTab') fetchHwaAlbums();
+      if (tabId === 'xapkTab') scanFiles();
+      if (tabId === 'songsTab') refreshGameAndSongs();
+    }
+
+    // Permission
+    function checkPermission() {
+      if (window.AndroidBridge) {
+        var hasPerm = window.AndroidBridge.hasStoragePermission();
+        document.getElementById('permBanner').style.display = hasPerm ? 'none' : 'block';
+      }
+    }
+    function requestPermission() {
+      if (window.AndroidBridge) {
+        window.AndroidBridge.requestStoragePermission();
+      }
+    }
+
+    // Config Parser & Formatter
+    function parseConfig(text) {
+      var lines = text.split('\n');
+      var map = {};
+      lines.forEach(function(line) {
+        var trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          var parts = trimmed.split('=');
+          if (parts.length === 2) {
+            map[parts[0].trim()] = parts[1].trim().toLowerCase() === 'true';
+          }
+        }
+      });
+      return map;
+    }
+
+    function buildConfigText() {
+      var autoplay = document.getElementById('cfg_autoplay').checked;
+      var forceperfect = document.getElementById('cfg_forceperfect').checked;
+      var blockfever = document.getElementById('cfg_blockfever').checked;
+      var cinema = document.getElementById('cfg_cinema').checked;
+      var ghostnotes = document.getElementById('cfg_ghostnotes').checked;
+
+      return `# ============================================================================
+#  [Muse Dash Mod Config - save custom key]
+#  뮤즈대시 모드 비서 앱을 통해 저장된 설정 파일입니다.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+#  [1] 플레이 보조
+# ----------------------------------------------------------------------------
+오토플레이=${autoplay}
+강제퍼펙트=${forceperfect}
+피버충전금지=${blockfever}
+
+# ----------------------------------------------------------------------------
+#  [2] 연출
+# ----------------------------------------------------------------------------
+시네마=${cinema}
+고스트노트보이기=${ghostnotes}
+`;
+    }
+
+    function loadConfigFromFile() {
+      checkPermission();
+      if (!window.AndroidBridge) return;
+      var raw = window.AndroidBridge.loadConfig();
+      if (!raw || raw.startsWith("ERROR:")) {
+        resetDefaults();
+        return;
+      }
+      var cfg = parseConfig(raw);
+      document.getElementById('cfg_autoplay').checked = !!cfg['오토플레이'];
+      document.getElementById('cfg_forceperfect').checked = cfg['강제퍼펙트'] !== undefined ? cfg['강제퍼펙트'] : true;
+      document.getElementById('cfg_blockfever').checked = !!cfg['피버충전금지'];
+      document.getElementById('cfg_cinema').checked = cfg['시네마'] !== undefined ? cfg['시네마'] : true;
+      document.getElementById('cfg_ghostnotes').checked = cfg['고스트노트보이기'] !== undefined ? cfg['고스트노트보이기'] : true;
+    }
+
+    function saveConfigToFile() {
+      if (!window.AndroidBridge) return;
+      var txt = buildConfigText();
+      window.AndroidBridge.saveConfig(txt);
+    }
+
+    function resetDefaults() {
+      document.getElementById('cfg_autoplay').checked = false;
+      document.getElementById('cfg_forceperfect').checked = true;
+      document.getElementById('cfg_blockfever').checked = false;
+      document.getElementById('cfg_cinema').checked = true;
+      document.getElementById('cfg_ghostnotes').checked = true;
+      if (window.AndroidBridge) {
+        window.AndroidBridge.showToast("기본값으로 복원되었습니다. [설정 저장]을 누르면 반영됩니다.");
+      }
+    }
+
+    // hwa.moe Online Store
+    var SUPABASE_ALBUMS_URL = "https://dhoisshndrljjvlruvuk.supabase.co/rest/v1/albums?select=*&order=created_at.desc";
+    var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRob2lzc2huZHJsamp2bHJ1dnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzQyMDIsImV4cCI6MjA5NzIxMDIwMn0.wuTmjb8_k_-YsCmSxFdmpSznCLKt8X_R_9U4hh9tMaY";
+
+    function fetchHwaAlbums() {
+      var container = document.getElementById('hwaAlbumListContainer');
+      container.innerHTML = '<div class="empty-state">hwa.moe 최신 앨범을 가져오는 중...</div>';
+
+      fetch(SUPABASE_ALBUMS_URL, {
+        headers: {
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": "Bearer " + SUPABASE_ANON_KEY
+        }
+      })
+      .then(r => r.json())
+      .then(albums => {
+        if (!albums || albums.length === 0) {
+          container.innerHTML = '<div class="empty-state">등록된 앨범이 없습니다.</div>';
+          return;
+        }
+
+        // update installed songs list
+        if (window.AndroidBridge) {
+          try {
+            var raw = window.AndroidBridge.scanCustomSongs();
+            installedSongsList = JSON.parse(raw) || [];
+          } catch(e) {}
+        }
+
+        var html = '';
+        albums.forEach(album => {
+          if (album.is_disabled) return;
+
+          var fName = (album.download_filename || '').replace(/\.zip$/i, '').trim();
+          var albumTitle = (album.title || '').trim();
+
+          var match = installedSongsList.find(s => {
+            var sf = (s.folder || '').toLowerCase();
+            var st = (s.title || '').toLowerCase();
+            return sf === fName.toLowerCase() || sf === albumTitle.toLowerCase() ||
+                   st === fName.toLowerCase() || st === albumTitle.toLowerCase();
+          });
+
+          var isInstalled = !!match;
+          var exactFolder = match ? match.folder : (fName || albumTitle);
+
+          var btnHtml = isInstalled
+            ? `<div style="display:flex; gap:6px;">
+                 <button class="btn-small" style="background:#10b981; cursor:default;">✅ 설치됨</button>
+                 <button class="btn-small" style="background:#ef4444;" onclick="deleteSongFromStore('${encodeURIComponent(exactFolder)}', '${encodeURIComponent(album.title)}', this)">🗑️</button>
+               </div>`
+            : `<button id="btn_dl_${album.id}" class="btn-small" onclick="downloadSong('${album.id}', '${encodeURIComponent(album.title)}', '${encodeURIComponent(album.download_filename || '')}')">⬇️ 주입</button>`;
+
+          var tagBadges = (album.tags || []).map(t => `<span class="badge" style="background:rgba(255,255,255,0.1); color:#bbb;">${t}</span>`).join(' ');
+
+          html += `
+            <div class="online-album-card" id="card_${album.id}">
+              <img class="album-cover" src="${album.cover_url || ''}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'64\\' height=\\'64\\'><rect fill=\\'%23252532\\' width=\\'64\\' height=\\'64\\'/></svg>'" />
+              <div class="file-details">
+                <div class="file-name">${album.title}</div>
+                <div class="file-meta">
+                  <span class="badge badge-diff">Lv.${album.difficulty || '?'}</span>
+                  ${tagBadges}
+                </div>
+              </div>
+              <div>${btnHtml}</div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      })
+      .catch(err => {
+        container.innerHTML = '<div class="empty-state">앨범 목록을 불러오지 못했습니다: ' + err.message + '</div>';
+      });
+    }
+
+    function downloadSong(albumId, encTitle, encFilename) {
+      var title = decodeURIComponent(encTitle);
+      var filename = decodeURIComponent(encFilename);
+      var btn = document.getElementById('btn_dl_' + albumId);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "다운 중...";
+        btn.style.background = "#6b7280";
+      }
+
+      if (window.AndroidBridge) {
+        window.AndroidBridge.downloadHwaSong(albumId, title, filename);
+      }
+    }
+
+    function deleteSongFromStore(encFolder, encTitle, btnEl) {
+      var folder = decodeURIComponent(encFolder);
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.textContent = "삭제중";
+        btnEl.style.opacity = "0.5";
+      }
+      if (window.AndroidBridge) {
+        window.AndroidBridge.deleteCustomSong(folder);
+      }
+    }
+
+    function deleteCustomSong(encFolder, encTitle, btnEl) {
+      var folder = decodeURIComponent(encFolder);
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.textContent = "삭제 중...";
+        btnEl.style.opacity = "0.5";
+      }
+      if (window.AndroidBridge) {
+        window.AndroidBridge.deleteCustomSong(folder);
+      }
+    }
+
+    window.onSongDeleted = function(folderName) {
+      // 로컬 캐시에서 즉시 필터링
+      installedSongsList = installedSongsList.filter(s => {
+        var sf = (s.folder || '').toLowerCase();
+        var st = (s.title || '').toLowerCase();
+        var target = (folderName || '').toLowerCase();
+        return sf !== target && st !== target;
+      });
+      refreshGameAndSongs();
+      fetchHwaAlbums();
+    };
+
+    window.onSongInstalled = function(albumId) {
+      var btn = document.getElementById('btn_dl_' + albumId);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "✅ 설치됨";
+        btn.style.background = "#10b981";
+      }
+      refreshGameAndSongs();
+      fetchHwaAlbums();
+    };
+
+    window.onSongDownloadFailed = function(albumId, err) {
+      var btn = document.getElementById('btn_dl_' + albumId);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "⬇️ 주입";
+        btn.style.background = "linear-gradient(135deg, var(--accent), #ff5294)";
+      }
+    };
+
+    // XAPK Scan & Install
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+      return (bytes / 1073741824).toFixed(2) + ' GB';
+    }
+
+    function scanFiles() {
+      checkPermission();
+      if (!window.AndroidBridge) return;
+      var raw = window.AndroidBridge.scanFiles();
+      var container = document.getElementById('fileListContainer');
+      try {
+        var files = JSON.parse(raw);
+        if (!files || files.length === 0) {
+          container.innerHTML = '<div class="empty-state">다운로드 폴더에 감지된 XAPK 또는 APK 파일이 없습니다.</div>';
+          return;
+        }
+        var html = '';
+        files.forEach(function(f) {
+          var highlight = f.isMuseDash ? 'highlight' : '';
+          var badgeClass = f.isXapk ? 'badge-xapk' : 'badge-apk';
+          var badgeText = f.isXapk ? 'XAPK' : 'APK';
+          html += `
+            <div class="file-item ${highlight}">
+              <div class="file-details">
+                <div class="file-name">${f.name}</div>
+                <div class="file-meta">
+                  <span class="badge ${badgeClass}">${badgeText}</span>
+                  <span>${formatBytes(f.size)}</span>
+                </div>
+              </div>
+              <button class="btn-small" onclick="installPackage('${encodeURIComponent(f.path)}')">설치</button>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state">파일 목록 파싱 오류</div>';
+      }
+    }
+
+    function installPackage(encodedPath) {
+      var path = decodeURIComponent(encodedPath);
+      if (window.AndroidBridge) {
+        window.AndroidBridge.installPackage(path);
+      }
+    }
+
+    // Custom Songs & Launcher
+    function refreshGameAndSongs() {
+      if (!window.AndroidBridge) return;
+      var installed = window.AndroidBridge.isGameInstalled();
+      var statusEl = document.getElementById('gameStatusText');
+      if (installed) {
+        statusEl.textContent = "뮤즈대시 모드 설치 확인됨 (준비 완료)";
+        statusEl.style.color = "#00e5ff";
+      } else {
+        statusEl.textContent = "뮤즈대시 모드 미설치 (XAPK 탭에서 설치 필요)";
+        statusEl.style.color = "#ffaa00";
+      }
+
+      var rawSongs = window.AndroidBridge.scanCustomSongs();
+      var songContainer = document.getElementById('songListContainer');
+      try {
+        var songs = JSON.parse(rawSongs);
+        installedSongsList = songs || [];
+
+        if (!songs || songs.length === 0) {
+          songContainer.innerHTML = '<div class="empty-state">기기에 등록된 커스텀 곡이 없습니다. [hwa.moe] 탭에서 다운로드 받아보세요!</div>';
+          return;
+        }
+        var sHtml = '';
+        songs.forEach(function(s) {
+          var bmsBadge = s.bmsCount > 0 ? `<span class="badge badge-apk">${s.bmsCount}개 BMS</span>` : '';
+          var musicBadge = s.hasMusic ? `<span class="badge badge-xapk">BGM</span>` : '';
+          var coverBadge = s.hasCover ? `<span class="badge" style="background:rgba(255,255,255,0.15); color:#fff;">자켓</span>` : '';
+          sHtml += `
+            <div class="file-item">
+              <div class="file-details">
+                <div class="file-name">🎵 ${s.title}</div>
+                <div class="file-meta">
+                  <span style="color:var(--cyan);">${s.artist}</span>
+                  <span>(${s.folder})</span>
+                  ${bmsBadge}
+                  ${musicBadge}
+                  ${coverBadge}
+                </div>
+              </div>
+              <button class="btn-small" style="background:#ef4444;" onclick="deleteCustomSong('${encodeURIComponent(s.folder)}', '${encodeURIComponent(s.title)}', this)">🗑️ 삭제</button>
+            </div>
+          `;
+        });
+        songContainer.innerHTML = sHtml;
+      } catch (e) {
+        songContainer.innerHTML = '<div class="empty-state">곡 목록 로드 오류</div>';
+      }
+    }
+
+    function launchGame() {
+      if (window.AndroidBridge) {
+        window.AndroidBridge.launchGame();
+      }
+    }
+
+    window.onAppResume = function() {
+      checkPermission();
+      loadConfigFromFile();
+      refreshGameAndSongs();
+    };
+
+    // Initial load
+    window.onload = function() {
+      checkPermission();
+      loadConfigFromFile();
+      refreshGameAndSongs();
+    };
+  </script>
+</body>
+</html>

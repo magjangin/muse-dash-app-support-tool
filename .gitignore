@@ -1,0 +1,22 @@
+# Build outputs
+build/
+bin/
+obj/
+*.apk
+*.dex
+
+# Android SDK & standalone tools (large binaries)
+sdk/
+tools/apktool.jar
+
+# IDE & OS
+.idea/
+.vscode/
+*.suo
+*.user
+Thumbs.db
+[Dd]esktop.ini
+
+# Logs & temp
+*.log
+*.tmp
