@@ -41,11 +41,31 @@ public class SongProvider extends ContentProvider {
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         List<String> seg = uri.getPathSegments();
-        if (seg.size() != 1 || !"list".equals(seg.get(0))) return null;
-        MatrixCursor cursor = new MatrixCursor(new String[]{"path", "size", "mtime"});
-        File base = new File(HWA_DIR);
-        if (base.isDirectory()) addFiles(base, "", cursor);
-        return cursor;
+        if (seg.size() == 1 && "list".equals(seg.get(0))) {
+            MatrixCursor cursor = new MatrixCursor(new String[]{"path", "size", "mtime"});
+            File base = new File(HWA_DIR);
+            if (base.isDirectory()) addFiles(base, "", cursor);
+            return cursor;
+        }
+        if (seg.size() == 1 && "record_resets".equals(seg.get(0))) {
+            MatrixCursor cursor = new MatrixCursor(new String[]{"target"});
+            Context ctx = getContext();
+            if (ctx != null) {
+                java.util.Set<String> targets = AndroidBridge.getPendingRecordResets(ctx);
+                for (String t : targets) {
+                    cursor.addRow(new Object[]{t});
+                }
+            }
+            return cursor;
+        }
+        if (seg.size() == 1 && "record_resets_ack".equals(seg.get(0))) {
+            Context ctx = getContext();
+            if (ctx != null) {
+                AndroidBridge.clearPendingRecordResets(ctx);
+            }
+            return new MatrixCursor(new String[]{"status"});
+        }
+        return null;
     }
 
     private void addFiles(File dir, String prefix, MatrixCursor cursor) {

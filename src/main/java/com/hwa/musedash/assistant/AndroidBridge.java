@@ -1,6 +1,8 @@
 package com.hwa.musedash.assistant;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
@@ -796,5 +798,57 @@ public class AndroidBridge {
     @JavascriptInterface
     public void showToast(String msg) {
         activity.runOnUiThread(new ToastTask(activity, msg));
+    }
+
+    private static final String PREF_RECORDS = "custom_record_resets";
+    private static final String KEY_PENDING_RESETS = "pending_targets";
+
+    public static Set<String> getPendingRecordResets(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences(PREF_RECORDS, Context.MODE_PRIVATE);
+        Set<String> set = sp.getStringSet(KEY_PENDING_RESETS, null);
+        return set != null ? new HashSet<>(set) : new HashSet<String>();
+    }
+
+    public static void addPendingRecordReset(Context ctx, String target) {
+        SharedPreferences sp = ctx.getSharedPreferences(PREF_RECORDS, Context.MODE_PRIVATE);
+        Set<String> set = sp.getStringSet(KEY_PENDING_RESETS, null);
+        Set<String> updated = set != null ? new HashSet<>(set) : new HashSet<String>();
+        if ("ALL".equals(target)) {
+            updated.clear();
+            updated.add("ALL");
+        } else {
+            if (!updated.contains("ALL")) {
+                updated.add(target);
+            }
+        }
+        sp.edit().putStringSet(KEY_PENDING_RESETS, updated).apply();
+    }
+
+    public static void clearPendingRecordResets(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences(PREF_RECORDS, Context.MODE_PRIVATE);
+        sp.edit().remove(KEY_PENDING_RESETS).apply();
+    }
+
+    @JavascriptInterface
+    public void resetAllRecords() {
+        addPendingRecordReset(activity, "ALL");
+        SongProvider.grantToGame(activity);
+        showToast("전체 커스텀 기록 초기화가 예약되었습니다.\n(뮤즈대시 실행 시 적용)");
+    }
+
+    @JavascriptInterface
+    public void resetSongRecord(String folderName) {
+        if (folderName == null || folderName.trim().isEmpty()) return;
+        addPendingRecordReset(activity, folderName.trim());
+        SongProvider.grantToGame(activity);
+        showToast("'" + folderName + "' 기록 초기화가 예약되었습니다.\n(뮤즈대시 실행 시 적용)");
+    }
+
+    @JavascriptInterface
+    public String getPendingRecordResets() {
+        Set<String> set = getPendingRecordResets(activity);
+        JSONArray arr = new JSONArray();
+        for (String s : set) arr.put(s);
+        return arr.toString();
     }
 }

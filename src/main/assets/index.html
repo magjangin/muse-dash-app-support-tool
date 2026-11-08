@@ -404,6 +404,61 @@
     .tab-content.active {
       display: block;
     }
+
+    /* Modal Overlay & Dialog */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal-box {
+      background: #1c1c28;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 22px 20px;
+      width: 100%;
+      max-width: 320px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      text-align: center;
+    }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+    .modal-msg {
+      font-size: 13px;
+      color: #ccc;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      white-space: pre-line;
+      word-break: break-all;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .modal-actions .btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 13px;
+      margin: 0;
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -531,7 +586,10 @@
     </div>
 
     <div class="card">
-      <div class="card-title">🎵 기기에 등록된 커스텀 곡</div>
+      <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>🎵 기기에 등록된 커스텀 곡</span>
+        <button class="btn-small" style="background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.4); color:#ff6b8a; font-size:11px;" onclick="confirmResetAllRecords()">🔄 전체 기록 초기화</button>
+      </div>
       <div id="songListContainer">
         <div class="empty-state">곡 목록을 불러오는 중...</div>
       </div>
@@ -964,7 +1022,10 @@
                   ${coverBadge}
                 </div>
               </div>
-              <button class="btn-small" style="background:#ef4444;" onclick="deleteCustomSong('${encodeURIComponent(s.folder)}', '${encodeURIComponent(s.title)}', this)">🗑️ 삭제</button>
+              <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button class="btn-small" style="background:#282836; border:1px solid rgba(255,255,255,0.15); color:#ffd166;" onclick="confirmResetSongRecord('${encodeURIComponent(s.folder)}', '${encodeURIComponent(s.title)}')">🔄 기록 리셋</button>
+                <button class="btn-small" style="background:#ef4444;" onclick="deleteCustomSong('${encodeURIComponent(s.folder)}', '${encodeURIComponent(s.title)}', this)">🗑️ 삭제</button>
+              </div>
             </div>
           `;
         });
@@ -972,6 +1033,50 @@
       } catch (e) {
         songContainer.innerHTML = '<div class="empty-state">곡 목록 로드 오류</div>';
       }
+    }
+
+    // Modal logic
+    var modalCallback = null;
+    function showConfirmModal(title, msg, onConfirm) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalMsg').textContent = msg;
+      modalCallback = onConfirm;
+      document.getElementById('confirmModal').style.display = 'flex';
+    }
+    function closeModal() {
+      document.getElementById('confirmModal').style.display = 'none';
+      modalCallback = null;
+    }
+    function executeModalAction() {
+      var cb = modalCallback;
+      closeModal();
+      if (cb) cb();
+    }
+
+    function confirmResetAllRecords() {
+      showConfirmModal(
+        "전체 커스텀 기록 초기화",
+        "모든 커스텀 곡의 로컬 플레이 기록(점수, 정확도, 풀콤보 등)을 초기화하시겠습니까?\n\n※ 뮤즈대시 모드 실행 시 실제 삭제가 완료됩니다.",
+        function() {
+          if (window.AndroidBridge) {
+            window.AndroidBridge.resetAllRecords();
+          }
+        }
+      );
+    }
+
+    function confirmResetSongRecord(encFolder, encTitle) {
+      var folder = decodeURIComponent(encFolder);
+      var title = decodeURIComponent(encTitle);
+      showConfirmModal(
+        "곡 기록 초기화",
+        "'" + title + "' 곡의 로컬 플레이 기록을 초기화하시겠습니까?\n\n※ 뮤즈대시 모드 실행 시 실제 삭제가 완료됩니다.",
+        function() {
+          if (window.AndroidBridge) {
+            window.AndroidBridge.resetSongRecord(folder);
+          }
+        }
+      );
     }
 
     function launchGame() {
@@ -993,5 +1098,16 @@
       refreshGameAndSongs();
     };
   </script>
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div id="modalTitle" class="modal-title">확인</div>
+      <div id="modalMsg" class="modal-msg">내용</div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+        <button id="modalConfirmBtn" class="btn btn-danger" onclick="executeModalAction()">초기화</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

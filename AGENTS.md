@@ -40,6 +40,11 @@
    - 삭제 시 다시 `[⬇️ 주입]`으로 자동 전환되어 자유로운 다운로드/삭제 루프 지원.
 3. **커스텀 곡 & 런처 (Custom Songs & Launcher)**:
    - 기기 내 등록된 커스텀 곡 목록 실시간 파싱 및 세부 메타데이터(BMS, BGM, 자켓) 표시.
+   - **커스텀 로컬 기록 초기화 (전체 / 곡별)**:
+     - **`[ 🔄 전체 기록 초기화 ]`**: 모든 커스텀 곡의 로컬 플레이 기록(점수, 정확도, 풀콤보 등) 일괄 리셋 예약.
+     - 각 곡별 **`[ 🔄 기록 리셋 ]`**: 특정 곡의 모든 난이도 기록 리셋 예약.
+     - 오터치 방지를 위한 Fluent 다크 감성의 인앱 확인 모달(`confirmModal`) 지원.
+     - `SongProvider` IPC를 통해 게임 시작 시 `files/record/` 내 대상 `.json`, `.bak` 파일을 게임 UID 권한으로 완벽 클렌징 (#14).
    - 각 곡별 **`[🗑️ 삭제]`** 버튼 지원: 공용 폴더에서 지운다. 게임 폴더의 사본은 게임이 다음 시작 때 지운다(`.from_assistant` 표시가 있는 폴더만, adb로 넣은 곡은 그대로).
    - `[ ▶ 뮤즈대시 모드 실행하기 ]` 터치 시 `com.prpr.musedash.mod` 앱 자동 런칭.
 4. **XAPK 탐색 및 인스톨러 (XAPK Manager)**:
@@ -142,3 +147,9 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
    - 원인: APK를 `ACTION_VIEW` + `application/vnd.android.package-archive`로 넘겼는데, 이 폰은 그 기본 앱이 FV 파일 관리자의 HexViewerActivity였다(`pm resolve-activity`로 확인). 사용자 기기의 '기본 앱' 설정에 따라 설치가 안 될 수 있었다.
    - 해결: `ACTION_INSTALL_PACKAGE`를 받는 **시스템 앱**(`queryIntentActivities(..., MATCH_SYSTEM_ONLY)`, 이 기기에선 `com.google.android.packageinstaller` 하나)으로 `setPackage`를 못박는다. 이후 [설치] → 시스템 설치 창 → 설치 완료(`installerPackageName=com.google.android.packageinstaller`).
    - 비서 앱이 미리 만든 `Android/obb/<패키지>/` 파일(소유자 = 비서 앱 uid)은 게임이 설치되는 순간 게임 uid로 바뀌어 게임이 읽을 수 있다(실측).
+14. **커스텀 로컬 플레이 기록 초기화 (전체 및 곡별) 파이프라인 (2026-11-09 구현)**:
+   - **설계 Rationale**: 커스텀 곡 기록은 `safety.ts`로 공식 세이브에서 인메모리 격리되어 `files/record/<곡폴더>_<난이도>.json`에 보존됨. Android 11+의 Scoped Storage로 인해 비서 앱이 게임 격리 폴더에 직접 접근하여 파일을 삭제할 수 없음(EACCES).
+   - **해결 (SongProvider 기반 IPC 통신)**:
+     - 비서 앱(`SongProvider.java`): `content://com.hwa.musedash.assistant.songs/record_resets` 쿼리 시 초기화 예약된 대상 목록(`ALL` 또는 개별 곡 폴더명) 반환, `record_resets_ack` 시 대기열 클리어.
+     - 비서 앱 UI(`index.html`): WebView 기본 `confirm()` 모달 차단 버그(Dead End #6)를 완벽 우회하는 인앱 커스텀 확인 모달(`confirmModal`) 탑재.
+     - 게임 쪽(`assistant.ts`): `pullFromAssistant()` 호출 시 `record_resets` 쿼리를 확인하여, 게임 자신의 프로세스(UID) 권한으로 `MOD_DIR/record` 내 대상 `.json`, `.bak`, `.tmp` 파일 삭제 후 `record_resets_ack` 전송. 개인 전체판 및 공개본 양쪽 모두 동기화 적용 완료.
