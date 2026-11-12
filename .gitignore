@@ -20,3 +20,10 @@ Thumbs.db
 # Logs & temp
 *.log
 *.tmp
+
+# Gradle
+.gradle/
+local.properties
+app/build/
+.kotlin/
+captures/

@@ -19,10 +19,20 @@
 ---
 
 ## 2. 아키텍처 및 설계 Rationale
-- **경량 네이티브 + Fluent WebView 하이브리드 아키텍처**:
-  - Android Studio/Gradle 의존성 및 무거운 .NET MAUI/Avalonia Workload UAC 권한 문제(Windows UAC 차단 및 pending reboot)를 우회하기 위해, **Google 공식 Android Build-Tools(aapt2, d8) + Java 21 + Uber-APK-Signer** 기반의 독립 빌드 파이프라인(`build_apk.py`)을 구축.
-  - UI는 Avalonia Fluent Dark 모던 감성(아크릴 블러, 네온 퍼플/시안 악센트, 부드러운 스위치 토글)을 100% 반영한 CSS3/HTML5 기반.
-  - 백엔드는 Java Reflection/Native Android SDK 기반의 `AndroidBridge`로 시스템 파일 I/O 및 패키지 인스톨러 인텐트를 직결 제어.
+- **v2.0.0 (2026-11-12)부터 일반 Gradle 프로젝트** (`app/` 모듈, AGP 9.5.1, Gradle 9.9.1 래퍼, compileSdk 36, minSdk 26, targetSdk 34, Java 17). Android Studio 2026.2로 연다.
+  - 빌드 PC 환경: Android SDK `H:\Android\Sdk` (cmdline-tools, platform-tools 37, platforms;android-36, build-tools 36.1.0, 사용자 환경 변수 `ANDROID_HOME`), JDK 21 Temurin, Android Studio `C:\Program Files\Android\Android Studio`. `local.properties`(커밋 안 함)에 `sdk.dir=H\:/Android/Sdk`.
+  - v1.0.x의 `build_apk.py`(aapt2+javac+d8+uber-apk-signer)와 프로젝트 루트 `sdk/`(무시 목록)는 더 쓰지 않는다. `sdk/`는 지워도 된다.
+- **UI는 WebView 유지** (사용자 결정: Compose 재작성 대신 구조 정리). `assets/index.html`(뼈대) + `app.css` + `app.js`. 서버·파일에서 온 문자열은 `el()` 헬퍼로 `textContent`에만 넣는다 — v1.0.x는 hwa.moe 제목·태그를 `innerHTML`로 넣어, 서버 데이터가 파일 삭제·설치까지 하는 브리지를 부를 수 있었다.
+- **네이티브는 기능별 클래스, `AndroidBridge`는 얇은 JS 창구**: JSON 변환과 스레드 분리만 한다. 결과는 `MainActivity.callJs(fn, args...)`가 `JSONObject.quote`로 인코딩해 `window.on*`를 부른다.
+  - `config/ModConfig`(config.txt 규칙, 순수 Java) · `config/ConfigRepository`(파일·MediaStore 소유자)
+  - `songs/SongLibrary`(목록·삭제·자켓) · `songs/SongDownloader`(hwa.moe ZIP) · `songs/SafePaths`(폴더 이름·zip slip)
+  - `xapk/XapkRules`(순수) · `xapk/PackageInstaller` · `records/RecordResetQueue`
+  - 순수 Java로 뺀 규칙은 JVM 단위 테스트(`app/src/test`)로, 기기 의존 동작은 실기기 테스트(`app/src/androidTest`)로 검증한다.
+- **앱 본체는 외부 라이브러리 0개** (androidx 없음 → release APK 약 47KB). AGP 9의 내장 Kotlin이 kotlin-stdlib(약 2MB)를 넣어서 `gradle.properties`에 `android.builtInKotlin=false`를 둔다. FileProvider도 androidx 대신 `GenericFileProvider`(캐시·공용 저장소 아래 파일만 엶).
+- **서명 키 고정**: `signing/uber-debug.keystore` = v1.0.x를 서명한 uber-apk-signer 내장 공개 debug 키(alias `androiddebugkey`, 암호 `android`, SHA-256 `1e08a903…5953`). debug·release 모두 이 키. 바꾸면 기존 사용자가 앱을 지워야 해서 설정 예약·권한이 날아간다.
+- **targetSdk 34 유지**: 35+는 edge-to-edge 강제 등 동작이 바뀌고, 사이드로드 전용이라 올릴 이득이 없다.
+- **`QUERY_ALL_PACKAGES` 제거** → `<queries>`에 게임 패키지와 `INSTALL_PACKAGE` 인텐트만. 게임 설치 확인·실행·`grantUriPermission`, 시스템 설치기 찾기(#13) 모두 실기로 확인.
+- 곡 자켓은 `https://assistant.local/cover/<폴더>`를 `shouldInterceptRequest`에서 파일로 답한다(실제 네트워크로 안 나감). WebView에 `file://` 기기 경로를 열지 않기 위해서다.
 
 ---
 
@@ -31,13 +41,14 @@
    - `config.txt` 실시간 읽기/쓰기 파싱.
    - 플레이 보조: **오토플레이** (`autoPlay`), **강제퍼펙트** (`forcePerfect`), **피버충전금지** (`blockFever`).
    - 연출 옵션: **시네마** (MP4 BGA 비디오 재생, `enableCinema`), **고스트노트보이기** (`showGhostNotes`).
-   - [설정 저장], [새로고침], [기본값 복원] 원클릭 지원.
+   - 토글은 바꾸는 즉시 저장, [파일 다시 읽기], [기본값으로](확인 창). 저장 때마다 파일을 새로 읽어 바꾼 키 줄만 교체한다(앱을 켜 둔 채 PC에서 고친 내용을 옛 사본으로 덮지 않게). v2.0.0에서 [설정 저장] 버튼은 없앴다.
 2. **hwa.moe 온라인 커스텀 곡 다운로더 & 주입기 (Online Store)**:
    - 화평님의 공식 커스텀 앨범 플랫폼 `https://hwa.moe` Supabase REST API 연동.
    - 온라인 앨범 실시간 탐색 (자켓 커버, 곡 제목, 난이도 뱃지, 태그).
-   - [⬇️ 주입] 원클릭 시 `https://hwa.moe/api/download/<album_id>`에서 ZIP 스트림 다운로드 -> `/storage/emulated/0/MuseDash/hwa/`에 압축 해제. 게임은 다음 시작 때 `SongProvider`로 가져간다 (#10). v1.0.3부터 게임 폴더(`Android/data/.../files/hwa/`)에 직접 쓰는 미러링 코드는 없다 (#8 정정).
-   - 이미 기기에 설치된 곡 자동 감지 (`[✅ 설치됨]` 및 `[🗑️]` 삭제 지원).
-   - 삭제 시 다시 `[⬇️ 주입]`으로 자동 전환되어 자유로운 다운로드/삭제 루프 지원.
+   - 검색·필터(전체/안 받은 곡/받은 곡), 받기 진행 막대(서버가 Content-Length를 안 주면 '받는 중' 애니메이션 — hwa.moe가 그렇다).
+   - [⬇ 받기] 원클릭 시 `https://hwa.moe/api/download/<album_id>`에서 ZIP 스트림 다운로드 -> `/storage/emulated/0/MuseDash/hwa/`에 압축 해제. 게임은 다음 시작 때 `SongProvider`로 가져간다 (#10). v1.0.3부터 게임 폴더(`Android/data/.../files/hwa/`)에 직접 쓰는 미러링 코드는 없다 (#8 정정).
+   - v2.0.0: `.dl_<폴더>` 임시 폴더에 다 푼 뒤 `renameTo`로 바꾼다. 끊기면 반쪽 곡이 남지 않는다(점 폴더는 앱 목록·`SongProvider` 모두 건너뜀). 같은 폴더가 있으면 지우고 바꾼다. 남은 `.dl_`/`.del_`은 앱 시작 때 `SongLibrary.cleanupLeftovers()`가 지운다.
+   - 이미 기기에 있는 곡 자동 감지(폴더 이름 또는 info.txt 제목이 앨범 파일 이름·제목과 같으면) → `[✓ 받음]` + `[삭제]`.
 3. **커스텀 곡 & 런처 (Custom Songs & Launcher)**:
    - 기기 내 등록된 커스텀 곡 목록 실시간 파싱 및 세부 메타데이터(BMS, BGM, 자켓) 표시.
    - **커스텀 로컬 기록 초기화 (전체 / 곡별)**:
@@ -45,7 +56,8 @@
      - 각 곡별 **`[ 🔄 기록 리셋 ]`**: 특정 곡의 모든 난이도 기록 리셋 예약.
      - 오터치 방지를 위한 Fluent 다크 감성의 인앱 확인 모달(`confirmModal`) 지원.
      - `SongProvider` IPC를 통해 게임 시작 시 `files/record/` 내 대상 `.json`, `.bak` 파일을 게임 UID 권한으로 완벽 클렌징 (#14).
-   - 각 곡별 **`[🗑️ 삭제]`** 버튼 지원: 공용 폴더에서 지운다. 게임 폴더의 사본은 게임이 다음 시작 때 지운다(`.from_assistant` 표시가 있는 폴더만, adb로 넣은 곡은 그대로).
+   - 예약된 곡에 '기록 초기화 예약' 표시, [예약 취소](`cancelRecordResets`).
+   - 각 곡별 **`[삭제]`** (확인 창): 폴더를 `.del_<시각>_<이름>`으로 바꿔 목록·게임에서 바로 빼고 뒤에서 지운다(119MB·수천 파일 곡은 실제 삭제에 5~10초, 실측). 공용 폴더에서 지운다. 게임 폴더의 사본은 게임이 다음 시작 때 지운다(`.from_assistant` 표시가 있는 폴더만, adb로 넣은 곡은 그대로).
    - `[ ▶ 뮤즈대시 모드 실행하기 ]` 터치 시 `com.prpr.musedash.mod` 앱 자동 런칭.
 4. **XAPK 탐색 및 인스톨러 (XAPK Manager)**:
    - 기기 내 다운로드 폴더의 `.xapk` / `.apk` 자동 탐색 (MuseDash 관련 파일 하이라이트).
@@ -57,24 +69,34 @@
 
 ## 4. 빌드 및 배포 파이프라인
 ```powershell
-# 1. 원클릭 빌드 (AAPT2 리소스 컴파일 -> javac -> d8 dex -> uber-apk-signer 서명)
-python build_apk.py
+# 1. 빌드 + 단위 테스트 + lint (JAVA_HOME = JDK 17+)
+.\gradlew.bat testDebugUnitTest lintDebug assembleRelease
+# 산출물: app\build\outputs\apk\release\app-release.apk (약 47KB)
 
-# 산출물: build/bin/MuseDash_Mod_Assistant.apk (약 50KB)
+# 2. 실기기 계측 테스트 — connectedAndroidTest는 쓰지 않는다 (아래 Dead End #15)
+.\gradlew.bat assembleDebug assembleDebugAndroidTest
+nox_adb -s R3CR10T2JFA push app\build\outputs\apk\debug\app-debug.apk /data/local/tmp/t.apk
+nox_adb -s R3CR10T2JFA shell pm install -r -t --user 0 /data/local/tmp/t.apk
+nox_adb -s R3CR10T2JFA push app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk /data/local/tmp/t.apk
+nox_adb -s R3CR10T2JFA shell pm install -r -t --user 0 /data/local/tmp/t.apk
+nox_adb -s R3CR10T2JFA shell am instrument -w com.hwa.musedash.assistant.test/androidx.test.runner.AndroidJUnitRunner
+nox_adb -s R3CR10T2JFA shell pm uninstall com.hwa.musedash.assistant.test
 
-# 2. 실기기(ADB) 설치
-nox_adb -s R3CR10T2JFA push "build\bin\MuseDash_Mod_Assistant.apk" /data/local/tmp/app.apk
-nox_adb -s R3CR10T2JFA shell pm install -r -d -t --user 0 /data/local/tmp/app.apk
+# 3. 배포본 설치 (debug 위에 release를 덮어도 됨, 같은 키)
+nox_adb -s R3CR10T2JFA push app\build\outputs\apk\release\app-release.apk /data/local/tmp/app.apk
+nox_adb -s R3CR10T2JFA shell pm install -r --user 0 /data/local/tmp/app.apk
 
-# 3. All Files Access 권한 부여 (Android 11+)
+# 4. All Files Access 권한 부여 (Android 11+, 처음 한 번)
 nox_adb -s R3CR10T2JFA shell appops set com.hwa.musedash.assistant MANAGE_EXTERNAL_STORAGE allow
 
-# 4. 앱 실행
+# 5. 앱 실행
 nox_adb -s R3CR10T2JFA shell monkey -p com.hwa.musedash.assistant -c android.intent.category.LAUNCHER 1
 
-# 5. (기기당 1회) 공용 config.txt 소유자를 게임으로 지정 — 이게 없으면 게임이 설정 토글을 못 읽음 (Dead End #9)
+# 6. (기기당 1회) 공용 config.txt 소유자를 게임으로 지정 — 이게 없으면 게임이 설정 토글을 못 읽음 (Dead End #9)
 nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file --bind owner_package_name:s:com.prpr.musedash.mod --where \"_data='/storage/emulated/0/MuseDash/config.txt'\""
 ```
+- 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기).
+- 2026-11-12 결과: 단위 34/34, 실기기 7/7. 실기 수동 확인: 설정 탭 연동 표시, hwa.moe 받기(119MB)→내 곡 표시→삭제, 가짜 XAPK(비서 앱 자신의 APK+3MB OBB)로 OBB 배치→시스템 설치기, 앱의 [실행]으로 켠 게임의 `mod.log`에 `assistant-sync songs:5 failed:0`, `config-loaded source:/MuseDash/config.txt`.
 - PC에 Nox가 떠 있으면 `nox_adb`(서버 v36)가 계속 adb 서버를 재시작하므로, 플랫폼툴 `adb`(v41) 대신 반드시 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`를 쓴다 (버전 충돌로 `device not found` 발생).
 
 ---
@@ -153,3 +175,13 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
      - 비서 앱(`SongProvider.java`): `content://com.hwa.musedash.assistant.songs/record_resets` 쿼리 시 초기화 예약된 대상 목록(`ALL` 또는 개별 곡 폴더명) 반환, `record_resets_ack` 시 대기열 클리어.
      - 비서 앱 UI(`index.html`): WebView 기본 `confirm()` 모달 차단 버그(Dead End #6)를 완벽 우회하는 인앱 커스텀 확인 모달(`confirmModal`) 탑재.
      - 게임 쪽(`assistant.ts`): `pullFromAssistant()` 호출 시 `record_resets` 쿼리를 확인하여, 게임 자신의 프로세스(UID) 권한으로 `MOD_DIR/record` 내 대상 `.json`, `.bak`, `.tmp` 파일 삭제 후 `record_resets_ack` 전송. 개인 전체판 및 공개본 양쪽 모두 동기화 적용 완료.
+15. **v2.0.0 Gradle 전환 때 걸린 것들 (2026-11-12)**:
+   - `connectedAndroidTest`를 쓰지 않는다: 끝나면 앱을 **지워서** 비서 앱 데이터(기록 초기화 예약)와 `MANAGE_EXTERNAL_STORAGE` appop이 날아가고, Gradle은 SDK의 adb를 써서 Nox adb 서버와 충돌한다. 그래서 `assembleDebugAndroidTest` 후 `nox_adb`로 설치하고 `am instrument`로 돌린다.
+   - AGP 9는 Kotlin을 기본으로 켜서 Java 전용 앱에도 kotlin-stdlib가 들어가 debug APK가 약 900KB가 됐다 → `android.builtInKotlin=false`.
+   - `minSdk 26`이라 `String.strip()`, `List.of()`(API 30+)를 못 쓴다. lint `NewApi`가 잡는다. 대신 직접 만든 `ModConfig.strip()`(JS `trim()`처럼 BOM·NBSP까지 지움), `Arrays.asList`.
+   - 소스에 `'﻿'` 같은 BOM 문자 리터럴이 있으면 lint `ByteOrderMark` 오류 → `(char) 0xFEFF`.
+   - `sdkmanager` 최신판은 패키지 이름을 `platforms/android-36`처럼 `/`로 받는다. `platforms;android-36`은 조용히 무시돼 platform-tools만 깔렸다.
+   - Git Bash에서 `C:/Users/화평/...` 스크래치 경로가 깨져 파일이 엉뚱한 곳에 생겼다 → 도구·백업은 ASCII 경로(`H:\Android\...`)에 둔다. 기기 백업·시험 XAPK 생성기는 `H:\Android\_device_backup\`.
+   - Dead End #3(D8 익명 클래스 NPE)은 AGP의 D8에선 생기지 않는다. 이제 람다·익명 클래스를 쓴다.
+   - 시작 탭을 localStorage로 기억하게 했더니, XAPK 탭으로 시작하면 설정 상태가 안 그려졌다(실기기 테스트가 잡음) → 시작 때 `loadConfig()`를 항상 부른다.
+

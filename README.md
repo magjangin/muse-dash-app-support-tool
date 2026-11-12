@@ -86,66 +86,74 @@
 
 ## 🛠️ 빌드 및 배포 가이드
 
-복잡한 Android Studio나 무거운 Gradle 데몬 설치 없이, **독립형 Python 빌드 파이프라인**을 통해 초경량 Standalone 바이너리를 생성합니다.
+v2.0.0부터 일반 **Gradle 프로젝트**입니다. Android Studio로 폴더를 열어도 되고, 명령줄로도 빌드됩니다.
 
 ### 요구 사항
-* Python 3.8+
-* Java Development Kit (JDK 17 or JDK 21)
-* Android SDK Build-Tools (`aapt2`, `d8`) 및 `android.jar` (API 34/35)
+* JDK 17 이상 (21 권장)
+* Android SDK: `platforms;android-36`, `build-tools;36.1.0`, `platform-tools` — Android Studio가 깔아 주거나 `sdkmanager`로 설치
+* `local.properties`에 SDK 위치 (`sdk.dir=...`, Android Studio가 자동 생성) 또는 환경 변수 `ANDROID_HOME`
+* Gradle은 래퍼(`gradlew`)가 받아 옵니다 (Gradle 9.9.1, AGP 9.5.1)
 
-### 원클릭 빌드 & 실기기 배포
+### 빌드 & 테스트
 ```powershell
-# 1. Standalone APK 빌드 (약 45KB 초경량 APK 생성)
-python build_apk.py
+# 단위 테스트(JVM) + lint + 배포용 APK
+.\gradlew.bat testDebugUnitTest lintDebug assembleRelease
+# 산출물: app/build/outputs/apk/release/app-release.apk (약 47KB)
 
-# 2. 실기기(ADB) 무선/유선 설치
-adb push build/bin/MuseDash_Mod_Assistant.apk /data/local/tmp/app.apk
-adb shell pm install -r -d -t --user 0 /data/local/tmp/app.apk
+# 실기기 계측 테스트 (권한·데이터를 지우지 않도록 Gradle의 connectedAndroidTest 대신 직접 설치해 실행)
+.\gradlew.bat assembleDebug assembleDebugAndroidTest
+adb install -r -t app/build/outputs/apk/debug/app-debug.apk
+adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w com.hwa.musedash.assistant.test/androidx.test.runner.AndroidJUnitRunner
+adb uninstall com.hwa.musedash.assistant.test
+```
 
-# 3. Android 11+ 전체 파일 접근 권한 부여
+### 실기기 배포
+```powershell
+adb install -r app/build/outputs/apk/release/app-release.apk
+
+# Android 11+ 전체 파일 접근 권한 부여
 adb shell appops set com.hwa.musedash.assistant MANAGE_EXTERNAL_STORAGE allow
 
-# 4. 앱 실행
-adb shell monkey -p com.hwa.musedash.assistant -c android.intent.category.LAUNCHER 1
-
-# 5. (Android 11+, 기기당 1회) 게임이 공용 config.txt를 읽을 수 있게 소유 앱 지정
+# (Android 11+, 기기당 1회) 게임이 공용 config.txt를 읽을 수 있게 소유 앱 지정
 adb shell "content update --uri content://media/external/file --bind owner_package_name:s:com.prpr.musedash.mod --where \"_data='/storage/emulated/0/MuseDash/config.txt'\""
 ```
 
+### 서명
+배포 APK는 v1.0.x와 같은 키(`signing/uber-debug.keystore`, uber-apk-signer에 들어 있던 공개 debug 키)로 서명합니다. 그래야 기존 사용자가 앱을 지우지 않고 업데이트할 수 있습니다. 키를 바꾸면 사용자는 앱을 지우고 다시 설치해야 합니다.
+
 ### 릴리스 만들기
 ```powershell
-# 1. src/main/AndroidManifest.xml의 versionCode / versionName을 올리고 CHANGELOG.md 작성
+# 1. app/build.gradle.kts의 versionCode / versionName을 올리고 CHANGELOG.md 작성
 # 2. 빌드 후 버전이 붙은 이름으로 GitHub 릴리스에 업로드
-python build_apk.py
-Copy-Item build\bin\MuseDash_Mod_Assistant.apk build\bin\MuseDash_Mod_Assistant-v1.0.2.apk
-gh release create v1.0.2 build\bin\MuseDash_Mod_Assistant-v1.0.2.apk --title "v1.0.2" --notes-file <릴리스 노트 파일>
+.\gradlew.bat testDebugUnitTest lintDebug assembleRelease
+Copy-Item app\build\outputs\apk\release\app-release.apk MuseDash_Mod_Assistant-v2.0.0.apk
+gh release create v2.0.0 MuseDash_Mod_Assistant-v2.0.0.apk --title "v2.0.0" --notes-file <릴리스 노트 파일>
 ```
 
 ---
 
-## 🏛️ 아키텍처 및 기술 특징
+## 🏛️ 아키텍처
 
 ```
-[ Muse Dash Mod Assistant ]
-   ├── Frontend: HTML5 / CSS3 (Avalonia Fluent Dark, Acrylic Blur, iOS Switches)
-   │      └── WebView (Chromium Blink Engine + Hardware Acceleration)
-   │
-   ├── Native Bridge: AndroidBridge.java
-   │      ├── Config IO: /sdcard/MuseDash/config.txt
-   │      ├── SongProvider: /sdcard/MuseDash/hwa/ 를 게임에게만 읽기 전용으로 공개 (mod.js가 시작 시 가져감)
-   │      ├── Network Downloader: Multi-hop Redirect Stream Unzipper
-   │      └── Package Engine: GenericFileProvider APK/XAPK Installer
-   │
-   └── Target Game: com.prpr.musedash.mod (Unity IL2CPP 64-bit arm64-v8a)
-          └── mod.js Runtime Hook (Frida/IL2CPP Bridge)
+app/src/main/
+ ├── assets/                 화면 (WebView): index.html · app.css · app.js
+ └── java/com/hwa/musedash/assistant/
+      ├── MainActivity       WebView, 자켓 이미지 주소(https://assistant.local/cover/<곡>)
+      ├── AndroidBridge      window.AndroidBridge — JSON 변환과 백그라운드 스레드만 담당
+      ├── SongProvider       /MuseDash/hwa 를 게임에게만 읽기 전용으로 공개 (mod.js가 시작 시 가져감)
+      ├── GenericFileProvider  시스템 설치 화면에 APK 넘기기
+      ├── config/            ModConfig(config.txt 규칙, 순수 Java) · ConfigRepository(파일·소유자)
+      ├── songs/             SongLibrary(목록·삭제·자켓) · SongDownloader(hwa.moe ZIP) · SafePaths
+      ├── xapk/              XapkRules(OBB 위치 규칙) · PackageInstaller(XAPK 풀기·설치)
+      └── records/           RecordResetQueue(기록 초기화 예약)
+app/src/test/                JVM 단위 테스트 (config 규칙, ZIP 경로 안전, XAPK 규칙 등)
+app/src/androidTest/         실기기 테스트 (SongProvider 규약, config 소유자 유지, 화면)
 ```
 
-1. **Fluent WebView 하이브리드 아키텍처**:
-   - 시스템 UAC 권한 차단 및 Android Workload 종속성을 완전히 탈피하고 네이티브 OS API와 웹 UI를 직결.
-2. **Java 21 D8 호환성 최적화**:
-   - Java 21과 Android D8 간의 synthetic parameter metadata 불일치 버그를 방지하기 위해 정적 클래스 기반 Task 패턴 적용.
-3. **Ghost Song 완전 차단**:
-   - 공용 경로를 단일 진실 소스(Single Source of Truth)로 삼아, 삭제된 곡이 캐시나 이전 경로에서 유령 곡으로 재로드되는 현상을 방지.
+- 앱 본체는 외부 라이브러리 없이 Android SDK만 씁니다. 테스트 라이브러리는 APK에 들어가지 않습니다.
+- 서버(hwa.moe)·파일에서 온 문자열은 화면에 `textContent`로만 넣습니다 (HTML로 해석되지 않음).
+- 자세한 설계 이유와 실패 기록은 [AGENTS.md](AGENTS.md)에 있습니다.
 
 ---
 

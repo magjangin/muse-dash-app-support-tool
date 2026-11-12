@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>뮤즈대시 모드 비서</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+  <header class="appbar">
+    <div class="brand">
+      <div class="brand-icon">MD</div>
+      <div>
+        <div class="brand-title">뮤즈대시 모드 비서</div>
+        <div class="brand-sub">HWA CUSTOM ASSISTANT <span id="appVersion" class="ver"></span></div>
+      </div>
+    </div>
+    <button class="icon-btn" id="refreshAllBtn" aria-label="새로고침" title="새로고침">⟳</button>
+  </header>
+
+  <main>
+    <!-- 권한 배너 -->
+    <section id="permBanner" class="banner warn" hidden>
+      <div class="banner-body">
+        <h4>파일 접근 권한이 필요합니다</h4>
+        <p>설정 파일 수정, 곡 받기, XAPK 찾기에 '모든 파일에 대한 접근' 권한을 씁니다.</p>
+      </div>
+      <button class="btn btn-warn" data-action="requestPermission">권한 열기</button>
+    </section>
+
+    <!-- 탭 1: 설정 -->
+    <section id="tab-config" class="tab active" data-title="설정">
+      <div id="cfgLinkStatus" class="link-status"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>플레이 보조</h3>
+        </div>
+        <div class="settings" data-group="play"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>연출</h3>
+        </div>
+        <div class="settings" data-group="visual"></div>
+      </div>
+
+      <div class="row-actions">
+        <button class="btn btn-ghost" data-action="reloadConfig">⟳ 파일 다시 읽기</button>
+        <button class="btn btn-ghost" data-action="resetConfig">기본값으로</button>
+      </div>
+      <p class="hint">토글은 바꾸는 즉시 저장됩니다. 게임이 켜져 있으면 1초 안에 반영됩니다.</p>
+    </section>
+
+    <!-- 탭 2: hwa.moe -->
+    <section id="tab-store" class="tab" data-title="hwa.moe">
+      <div class="search">
+        <input id="storeSearch" type="search" placeholder="곡 제목·태그 검색" autocomplete="off">
+      </div>
+      <div class="filter-row">
+        <button class="chip active" data-filter="all">전체</button>
+        <button class="chip" data-filter="new">안 받은 곡</button>
+        <button class="chip" data-filter="installed">받은 곡</button>
+        <span class="spacer"></span>
+        <span id="storeCount" class="muted small"></span>
+      </div>
+      <div id="albumList" class="list"></div>
+    </section>
+
+    <!-- 탭 3: 내 곡 -->
+    <section id="tab-songs" class="tab" data-title="내 곡">
+      <div class="hero">
+        <div class="hero-label">GAME STATUS</div>
+        <div id="gameStatus" class="hero-status">확인 중…</div>
+        <button class="btn btn-launch" data-action="launchGame">▶ 뮤즈대시 모드 실행</button>
+        <p class="hint">곡을 받거나 지운 뒤에는 최근 앱에서 게임을 완전히 닫고 다시 켜야 반영됩니다.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>기기의 커스텀 곡 <span id="songCount" class="count"></span></h3>
+          <button class="btn btn-small btn-danger-soft" data-action="resetAllRecords">전체 기록 초기화</button>
+        </div>
+        <div id="pendingResets" class="pending" hidden></div>
+        <div id="songList" class="list"></div>
+      </div>
+    </section>
+
+    <!-- 탭 4: XAPK -->
+    <section id="tab-xapk" class="tab" data-title="XAPK">
+      <div class="card">
+        <div class="card-head">
+          <h3>설치 파일</h3>
+          <button class="btn btn-small btn-ghost" data-action="scanPackages">⟳ 다시 찾기</button>
+        </div>
+        <p class="hint">다운로드 폴더, /MuseDash, 저장소 최상위의 .xapk / .apk를 찾습니다. XAPK의 OBB는 자동으로 제자리에 넣습니다.</p>
+        <div id="packageList" class="list"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tabbtn active" data-tab="tab-config"><span class="ti">⚙</span><span>설정</span></button>
+    <button class="tabbtn" data-tab="tab-store"><span class="ti">🌐</span><span>hwa.moe</span></button>
+    <button class="tabbtn" data-tab="tab-songs"><span class="ti">🎵</span><span>내 곡</span></button>
+    <button class="tabbtn" data-tab="tab-xapk"><span class="ti">📦</span><span>XAPK</span></button>
+  </nav>
+
+  <!-- 확인 창: WebView는 confirm()이 늘 false라 직접 만든다 (Dead End #6) -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true">
+      <div id="modalTitle" class="modal-title"></div>
+      <div id="modalMsg" class="modal-msg"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-action="modalCancel">취소</button>
+        <button id="modalOk" class="btn btn-danger" data-action="modalOk">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
