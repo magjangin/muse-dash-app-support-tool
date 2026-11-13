@@ -45,7 +45,7 @@ public class MainActivityDeviceTest {
     public void screenLoads_bridgeWorks_tabsRender() throws Exception {
         try (ActivityScenario<MainActivity> sc = ActivityScenario.launch(MainActivity.class)) {
             assertEquals("true", waitFor(sc, "document.readyState==='complete' && typeof AndroidBridge==='object'", "true"));
-            assertEquals("5", eval(sc, "document.querySelectorAll('.setting input').length"));
+            assertEquals("7", eval(sc, "document.querySelectorAll('.setting input').length"));
             assertEquals("4", eval(sc, "document.querySelectorAll('.tabbtn').length"));
             // 설정 상태 문구가 그려졌다 (연동 여부와 상관없이)
             assertEquals("true", eval(sc, "document.getElementById('cfgLinkStatus').textContent.length > 0"));

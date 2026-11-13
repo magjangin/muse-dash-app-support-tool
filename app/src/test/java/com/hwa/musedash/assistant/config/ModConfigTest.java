@@ -57,13 +57,56 @@ public class ModConfigTest {
         Map<String, Boolean> v = ModConfig.resolve(raw);
         v.put("autoPlay", true);
         String out = ModConfig.apply(raw, v);
-        assertEquals("# 내 설정\n지연=120\n오토플레이=true\n오프셋=-30\n강제퍼펙트=true\n피버충전금지=false\n시네마=true\n고스트노트보이기=true\n", out);
+        // v2.1.0 이전 파일에는 새 키 두 개가 없어서 끝에 붙는다 (기본값 = mod.js 기본값이라 게임 동작은 그대로)
+        assertEquals("# 내 설정\n지연=120\n오토플레이=true\n오프셋=-30\n강제퍼펙트=true\n피버충전금지=false\n시네마=true\n고스트노트보이기=true\n"
+                + "강제크리스마스=false\n스파인스킨=true\n", out);
     }
 
     @Test
     public void apply_appendsMissingKeysAtEnd() {
         String out = ModConfig.apply("지연=120\n", ModConfig.defaults());
-        assertEquals("지연=120\n오토플레이=false\n강제퍼펙트=true\n피버충전금지=false\n시네마=true\n고스트노트보이기=true\n", out);
+        assertEquals("지연=120\n오토플레이=false\n강제퍼펙트=true\n피버충전금지=false\n시네마=true\n고스트노트보이기=true\n"
+                + "강제크리스마스=false\n스파인스킨=true\n", out);
+    }
+
+    @Test
+    public void resolve_newOptionsDefaultLikeModJs() {
+        // mod.js src/config.ts 기본값: forceChristmas false, enableSpineSkin true
+        Map<String, Boolean> v = ModConfig.resolve("오토플레이=false\n");
+        assertFalse(v.get("forceChristmas"));
+        assertTrue(v.get("enableSpineSkin"));
+    }
+
+    @Test
+    public void resolve_readsAliasesCaseInsensitive_lastLineWins() {
+        // mod.js와 같은 별칭: 크리스마스·forcechristmas, 커스텀스킨·SpineSkin, 올퍼펙트
+        Map<String, Boolean> v = ModConfig.resolve("강제크리스마스=false\n크리스마스 = true\nSpineSkin=false\n올퍼펙트=false\n");
+        assertTrue(v.get("forceChristmas"));
+        assertFalse(v.get("enableSpineSkin"));
+        assertFalse(v.get("forcePerfect"));
+        v = ModConfig.resolve("커스텀스킨=false\n스파인스킨=true\n");
+        assertTrue(v.get("enableSpineSkin"));
+    }
+
+    @Test
+    public void apply_rewritesAliasLinesToCanonicalKey_withoutAppendingDuplicates() {
+        String raw = "# 테스트\n크리스마스=false\n커스텀 스킨=true\n";
+        Map<String, Boolean> v = ModConfig.resolve(raw);
+        v.put("forceChristmas", true);
+        v.put("enableSpineSkin", false);
+        String out = ModConfig.apply(raw, v);
+        assertTrue(out.startsWith("# 테스트\n강제크리스마스=true\n스파인스킨=false\n"));
+        assertEquals(1, out.split("크리스마스", -1).length - 1);
+        assertEquals(1, out.split("스파인스킨", -1).length - 1);
+        assertEquals(v, ModConfig.resolve(out));
+    }
+
+    @Test
+    public void defaultTemplate_containsAllOptions() {
+        String out = ModConfig.defaultText(ModConfig.defaults());
+        for (ModConfig.Option o : ModConfig.OPTIONS) {
+            assertTrue(o.key, out.contains("\n" + o.key + "=" + o.defaultValue + "\n"));
+        }
     }
 
     @Test

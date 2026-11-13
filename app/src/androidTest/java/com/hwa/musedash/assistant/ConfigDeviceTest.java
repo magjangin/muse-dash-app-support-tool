@@ -62,7 +62,7 @@ public class ConfigDeviceTest {
         // 다시 읽어도 같은 값, 다른 토글은 그대로
         ConfigRepository.State reread = repo.state();
         assertEquals(flipped, reread.values.get("blockFever"));
-        for (String id : new String[]{"autoPlay", "forcePerfect", "enableCinema", "showGhostNotes"}) {
+        for (String id : new String[]{"autoPlay", "forcePerfect", "enableCinema", "showGhostNotes", "forceChristmas", "enableSpineSkin"}) {
             assertEquals(id, before.values.get(id), reread.values.get(id));
         }
 

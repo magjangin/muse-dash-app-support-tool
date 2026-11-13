@@ -11,8 +11,8 @@ android {
         minSdk = 26
         // targetSdk 35+는 edge-to-edge 강제 등 동작이 바뀐다. 사이드로드 전용 앱이라 올릴 이득이 없어 34로 둔다.
         targetSdk = 34
-        versionCode = 7
-        versionName = "2.0.1"
+        versionCode = 8
+        versionName = "2.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
