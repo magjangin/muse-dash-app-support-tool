@@ -15,6 +15,14 @@
   - 공용 경로: `/storage/emulated/0/MuseDash/hwa/`
   - 앱 전용 경로: `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`
 - **XAPK 검색 경로**: `/storage/emulated/0/Download/`, `/storage/emulated/0/MuseDash/`
+- **현재 비서 앱 버전**: v2.0.1 (versionCode 7, 2026-11-13 릴리스, main `57f7935` = PR #3 머지 커밋, GitHub Latest). 기기에도 이 release가 깔려 있다.
+- **게임 버전과 고정 여부**:
+  - 기기의 모드 게임 `com.prpr.musedash.mod`: versionName 6.8.0, versionCode 632, targetSdk 36. adb로 사이드로드한 복제 패키지라(`installerPackageName=null`, 마지막 갱신 2026-11-01) 스토어 자동 업데이트를 받지 않는다. 사실상 고정이다.
+  - Steam Build ID·DepotDownloader·`.acf` 패치 차단은 안드로이드라 해당 없다. 정품 `com.prpr.musedash`(Play 설치본)는 Play 자동 업데이트를 꺼 둬야 한다. 원본 APK 해시와 OBB 크기는 게임 저장소 AGENTS.md ①에 있다.
+  - 비서 앱은 게임의 `libil2cpp.so` RVA를 쓰지 않는다. 게임이 바뀌어도 영향받는 것은 SongProvider 규약을 쓰는 mod.js 쪽이다(3-1절).
+- **런타임 백엔드와 디컴파일 경로**:
+  - 게임은 Unity 2019.4.41f1 **IL2CPP**(arm64-v8a)다. 덤프·디컴파일은 게임 저장소 `H:\source\repos\com.prpr.musedash_v6.8.0-unity-android`에 있다: `il2cpp_dump\`(dump.cs·script.json·il2cpp.h), `jadx_src\`(Java), 후킹 RVA 표 `docs\hooks.md`.
+  - 비서 앱은 일반 Java 앱이라 디컴파일할 대상이 없다. 소스가 전부다.
 
 ---
 
@@ -67,6 +75,34 @@
 
 ---
 
+## 3-1. 게임 연동 규약 (주입 파이프라인·브리지 시그니처)
+비서 앱은 게임 프로세스에 아무것도 주입하지 않는다. 주입은 게임 쪽 Frida Gadget이 하고, 비서 앱은 그 mod.js가 읽어 가는 파일과 provider만 내놓는다. 아래 규약 가운데 하나를 바꾸면 게임 저장소의 mod.js도 같이 고쳐 다시 올려야 한다.
+
+- **게임 쪽 주입 경로** (자세한 건 게임 저장소 AGENTS.md ④):
+  - `com.prpr.musedash.mod`는 정품 APK에 `System.loadLibrary("frida-gadget")`을 넣은 복제 패키지다.
+  - Gadget은 script 모드로 `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/mod.js`를 실행한다(`on_change: reload`).
+  - mod.js 빌드: 게임 저장소 `tools/frida/mod`에서 `npm run build` → `build/clone/mod.js` → `nox_adb push build/clone/mod.js /sdcard/Android/data/com.prpr.musedash.mod/files/mod.js`.
+  - 이 경로가 PC 모드의 `Mods/`에 해당하는 배포 위치다. 기기에는 개인 전체판만 올린다(Dead End #10의 사고 기록).
+- **config.txt**: mod.js `src/config.ts`가 공용 `/MuseDash/config.txt`를 1초마다 읽는다. 못 읽으면 `files/save custom key/config.txt`로 폴백한다. 키는 `ModConfig`가 정의한다. 소유자 문제는 Dead End #9.
+- **SongProvider** (`content://com.hwa.musedash.assistant.songs`, `exported=false`, `grantToGame()`이 prefix 읽기 권한을 준다):
+  | URI | 반환 | 쓰는 곳 |
+  |---|---|---|
+  | `/list` | 커서 `(path, size, mtime)`, path는 `hwa/` 기준 상대 경로, 점 파일·폴더 제외 | `assistant.ts` `pullFromAssistant()` |
+  | `/file/<경로>` | 읽기 전용 파일(`..` 탈출·쓰기 거부) | 같은 곳, 크기가 다른 파일만 `files/hwa`로 복사 |
+  | `/record_resets` | 커서 `(target)`, `ALL` 또는 곡 폴더 이름 | 같은 곳, `files/record/`의 `.json`·`.bak`·`.tmp` 삭제 |
+  | `/record_resets_ack` | 커서 `(status)`, 예약 목록 비우기 | 삭제 뒤 |
+  - 권한은 `MainActivity.onCreate`·`onResume`·`launchGame`·기록 초기화 예약 때 준다. 게임을 강제 종료하거나 재부팅하면 권한이 사라진다.
+- **화면(JS) ↔ 네이티브** (`window.AndroidBridge`, 모든 메서드는 `@JavascriptInterface`, JavaBridge 스레드에서 불린다):
+  - 바로 JSON 문자열을 돌려주는 메서드: `getAppState`, `getConfig`, `setConfigOption(id, bool)`, `resetConfig`, `listSongs`, `getPendingRecordResets`, `scanPackages`. 모양은 `BridgeJson`이 정한다.
+  - 오래 걸리는 일은 `void`로 돌아오고, 결과는 `MainActivity.callJs`가 `window.on*`로 알린다:
+    - 곡 받기 `downloadSong(albumId, title, filename)` → `onSongProgress(albumId, percent, bytes)`, 끝나면 `onSongInstalled(albumId, folder)`, 실패하면 `onSongDownloadFailed(albumId, message)`.
+    - 곡 삭제 `deleteSong(folder)` → `onSongDeleted(folder, count)`.
+    - 설치 `installPackage(path)` → `onPackageStatus(path, message, percent)`, 끝나면 `onPackageDone(path, ok)`.
+  - 그 밖의 `void` 메서드: `requestStoragePermission`, `resetAllRecords`, `resetSongRecord(folder)`, `cancelRecordResets`, `launchGame`, `openUrl(https만)`, `showToast`.
+  - 네이티브가 부르는 것: `onAppResume()`, `onBackPressed()`. `onBackPressed()`가 `true`를 돌려주면 네이티브는 뒤로 가기를 하지 않는다.
+
+---
+
 ## 4. 빌드 및 배포 파이프라인
 ```powershell
 # 1. 빌드 + 단위 테스트 + lint (JAVA_HOME = JDK 17+)
@@ -97,8 +133,27 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
 ```
 - 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기).
 - 2026-11-12 결과: 단위 34/34, 실기기 7/7. 실기 수동 확인: 설정 탭 연동 표시, hwa.moe 받기(119MB)→내 곡 표시→삭제, 가짜 XAPK(비서 앱 자신의 APK+3MB OBB)로 OBB 배치→시스템 설치기, 앱의 [실행]으로 켠 게임의 `mod.log`에 `assistant-sync songs:5 failed:0`, `config-loaded source:/MuseDash/config.txt`.
-- 2026-11-13 v2.0.1(코드 분할만) 결과: 단위 34/34, lint 통과, 실기기 7/7, release 50,805바이트. 실기에 release 설치 후 실행 — WebView 콘솔 오류 없음.
+- 2026-11-13 v2.0.1(코드 분할만) 결과: 단위 34/34, lint 통과, 실기기 7/7. 브랜치 빌드(50,805바이트)를 실기에 깔아 실행했고 WebView 콘솔 오류가 없었다. 릴리스 첨부 파일은 머지 뒤 main에서 다시 빌드한 것이다(50,865바이트, 소스는 같고 바이트만 다름).
 - PC에 Nox가 떠 있으면 `nox_adb`(서버 v36)가 계속 adb 서버를 재시작하므로, 플랫폼툴 `adb`(v41) 대신 반드시 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`를 쓴다 (버전 충돌로 `device not found` 발생).
+
+### 릴리스 절차 (v2.0.0·v2.0.1에서 쓴 순서)
+```powershell
+# 1. 브랜치에서 versionCode/versionName 올리기 + CHANGELOG.md·README 릴리스 명령·이 문서 갱신 → 위 빌드·테스트 전부 통과
+git switch -c refactor/<이름>; git commit ...; git push -u origin refactor/<이름>
+gh pr create --base main --title "vX.Y.Z: ..." --body-file <파일>
+gh pr merge <번호> --merge --delete-branch     # 머지 커밋으로 합친다 (v2.0.0·v2.0.1 모두)
+git switch main; git pull --ff-only origin main; git fetch --prune origin
+# 2. 태그는 머지 커밋에 붙인다 (브랜치 커밋에 미리 붙였으면 지우고 다시)
+git tag -a vX.Y.Z -m "vX.Y.Z" <머지 커밋>
+git push origin vX.Y.Z
+git push local main vX.Y.Z                     # 원격 local = H:\local-repos\muse dash app support tool.git (로컬 미러)
+# 3. main에서 release를 다시 빌드해 버전 이름으로 첨부
+.\gradlew.bat assembleRelease
+Copy-Item app\build\outputs\apk\release\app-release.apk MuseDash_Mod_Assistant-vX.Y.Z.apk
+gh release create vX.Y.Z MuseDash_Mod_Assistant-vX.Y.Z.apk --title "vX.Y.Z — <한 줄 요약>" --notes-file <BOM 없는 UTF-8 파일> --verify-tag
+Remove-Item MuseDash_Mod_Assistant-vX.Y.Z.apk  # *.apk는 .gitignore에 있지만 루트에 남기지 않는다
+```
+- 이 저장소에는 CI가 없다. PR에 검사가 안 뜨는 게 정상이고, 위 로컬 빌드·실기기 테스트가 검증의 전부다.
 
 ---
 
@@ -185,4 +240,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
    - Git Bash에서 `C:/Users/화평/...` 스크래치 경로가 깨져 파일이 엉뚱한 곳에 생겼다 → 도구·백업은 ASCII 경로(`H:\Android\...`)에 둔다. 기기 백업·시험 XAPK 생성기는 `H:\Android\_device_backup\`.
    - Dead End #3(D8 익명 클래스 NPE)은 AGP의 D8에선 생기지 않는다. 이제 람다·익명 클래스를 쓴다.
    - 시작 탭을 localStorage로 기억하게 했더니, XAPK 탭으로 시작하면 설정 상태가 안 그려졌다(실기기 테스트가 잡음) → 시작 때 `loadConfig()`를 항상 부른다.
-
+16. **v2.0.1 릴리스 때 걸린 것들 (2026-11-13)**:
+   - 릴리스 노트를 PowerShell 5.1 `Set-Content -Encoding utf8`로 만들었더니 BOM이 붙어, GitHub 릴리스 본문 맨 앞에 `U+FEFF`가 들어갔다. `gh release edit --notes-file`로 BOM을 뺀 파일을 다시 올려 고쳤다. 노트는 Git Bash heredoc이나 `[IO.File]::WriteAllText(path, text, (New-Object Text.UTF8Encoding $false))`로 만든다.
+   - 태그를 브랜치 커밋에 먼저 붙였더니 PR 머지 커밋과 어긋났다. 트리는 같았지만 v2.0.0처럼 머지 커밋으로 옮겼다. 태그는 머지한 뒤에 붙인다.
+   - `app.js`를 나눌 때 ES 모듈(`type="module"`)은 쓰지 않았다. `file:///android_asset`에서 모듈 로딩이 CORS로 막힐 수 있고, 실기기 테스트가 전역 함수(`confirmBox`)를 직접 부른다. 일반 `<script>`는 최상위 `const`·`function`을 전역 렉시컬 환경으로 공유하므로 읽는 순서만 지키면 된다.
