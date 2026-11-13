@@ -64,6 +64,9 @@
 * **연출 및 그래픽 옵션**:
   * 🎬 **시네마 (`enableCinema`)**: 커스텀 차트 후면에 Full HD MP4 BGA 비디오 재생
   * 👻 **고스트노트보이기 (`showGhostNotes`)**: 투명 고스트 노트를 항상 선명하게 렌더링
+* **스킨 · 이벤트 옵션** (v2.1.0, 다음 판부터 적용):
+  * 🎨 **커스텀 스킨 (`enableSpineSkin`, 키 `스파인스킨`)**: 게임 폴더 `skin test/`의 Spine 스킨(캐릭터·노트) 적용
+  * 🎄 **강제크리스마스 (`forceChristmas`)**: 날짜와 상관없이 공식 곡 5번 씬 배경·보스를 크리스마스 판으로
 
 ### 2. 🌐 hwa.moe 커스텀 앨범 스토어 직결
 * 공식 커스텀 앨범 플랫폼 [hwa.moe](https://hwa.moe) Supabase REST API와 직결 연동.

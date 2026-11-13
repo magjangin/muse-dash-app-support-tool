@@ -15,7 +15,7 @@
   - 공용 경로: `/storage/emulated/0/MuseDash/hwa/`
   - 앱 전용 경로: `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`
 - **XAPK 검색 경로**: `/storage/emulated/0/Download/`, `/storage/emulated/0/MuseDash/`
-- **현재 비서 앱 버전**: v2.0.1 (versionCode 7, 2026-11-13 릴리스, main `57f7935` = PR #3 머지 커밋, GitHub Latest). 기기에도 이 release가 깔려 있다.
+- **현재 비서 앱 버전**: v2.1.0 (versionCode 8, 2026-11-13, 설정 토글 2개 추가). main에 머지했지만 **태그·GitHub 릴리스는 아직 없다**(GitHub Latest는 v2.0.1). 기기에는 v2.1.0 release 빌드가 깔려 있다.
 - **게임 버전과 고정 여부**:
   - 기기의 모드 게임 `com.prpr.musedash.mod`: versionName 6.8.0, versionCode 632, targetSdk 36. adb로 사이드로드한 복제 패키지라(`installerPackageName=null`, 마지막 갱신 2026-11-01) 스토어 자동 업데이트를 받지 않는다. 사실상 고정이다.
   - Steam Build ID·DepotDownloader·`.acf` 패치 차단은 안드로이드라 해당 없다. 정품 `com.prpr.musedash`(Play 설치본)는 Play 자동 업데이트를 꺼 둬야 한다. 원본 APK 해시와 OBB 크기는 게임 저장소 AGENTS.md ①에 있다.
@@ -49,6 +49,8 @@
    - `config.txt` 실시간 읽기/쓰기 파싱.
    - 플레이 보조: **오토플레이** (`autoPlay`), **강제퍼펙트** (`forcePerfect`), **피버충전금지** (`blockFever`).
    - 연출 옵션: **시네마** (MP4 BGA 비디오 재생, `enableCinema`), **고스트노트보이기** (`showGhostNotes`).
+   - 스킨·이벤트 (v2.1.0): **커스텀 스킨** (`enableSpineSkin`, 키 `스파인스킨`, 기본 켬), **강제크리스마스** (`forceChristmas`, 기본 끔). mod.js(`spine/index.ts`의 Spine Init 훅, `christmas.ts`)가 판을 시작할 때 값을 보므로 실시간이 아니라 다음 판부터 적용된다.
+   - 키·별칭·기본값은 `ModConfig.OPTIONS`가 mod.js `src/config.ts`의 `currentConfig`와 똑같이 갖는다. 별칭(`크리스마스`, `커스텀스킨`, `올퍼펙트`, 영문 키 등)도 대소문자 없이 읽고, 저장할 때 그 줄을 정식 키로 바꾼다. 별칭을 안 읽으면 사용자가 `크리스마스=true`로 적어 둔 파일에 앱이 `강제크리스마스=false`를 덧붙여 덮어써 버린다. mod.js에 설정이 늘면 여기 `OPTIONS`·`assets/js/config.js`의 `OPTIONS`·`defaultText`·실기기 테스트 토글 수를 같이 고친다.
    - 토글은 바꾸는 즉시 저장, [파일 다시 읽기], [기본값으로](확인 창). 저장 때마다 파일을 새로 읽어 바꾼 키 줄만 교체한다(앱을 켜 둔 채 PC에서 고친 내용을 옛 사본으로 덮지 않게). v2.0.0에서 [설정 저장] 버튼은 없앴다.
 2. **hwa.moe 온라인 커스텀 곡 다운로더 & 주입기 (Online Store)**:
    - 화평님의 공식 커스텀 앨범 플랫폼 `https://hwa.moe` Supabase REST API 연동.
@@ -133,6 +135,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
 ```
 - 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기).
 - 2026-11-12 결과: 단위 34/34, 실기기 7/7. 실기 수동 확인: 설정 탭 연동 표시, hwa.moe 받기(119MB)→내 곡 표시→삭제, 가짜 XAPK(비서 앱 자신의 APK+3MB OBB)로 OBB 배치→시스템 설치기, 앱의 [실행]으로 켠 게임의 `mod.log`에 `assistant-sync songs:5 failed:0`, `config-loaded source:/MuseDash/config.txt`.
+- 2026-11-13 v2.1.0(토글 2개) 결과: 단위 38/38, lint 통과, 실기기 7/7. 실기: 설정 탭에 '스킨 · 이벤트' 카드 표시 → [강제크리스마스] 켬 → 게임 재시작 시 `config-loaded ... forceChristmas:true`, `christmas-ready`, MediaStore 소유자는 계속 게임 → 다시 끔 → 게임을 앞으로 가져오자 `forceChristmas:false`로 다시 읽음. 원래 `config.txt` 끝에 `강제크리스마스=false`·`스파인스킨=true` 두 줄만 붙었다(나머지 바이트 그대로).
 - 2026-11-13 v2.0.1(코드 분할만) 결과: 단위 34/34, lint 통과, 실기기 7/7. 브랜치 빌드(50,805바이트)를 실기에 깔아 실행했고 WebView 콘솔 오류가 없었다. 릴리스 첨부 파일은 머지 뒤 main에서 다시 빌드한 것이다(50,865바이트, 소스는 같고 바이트만 다름).
 - PC에 Nox가 떠 있으면 `nox_adb`(서버 v36)가 계속 adb 서버를 재시작하므로, 플랫폼툴 `adb`(v41) 대신 반드시 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`를 쓴다 (버전 충돌로 `device not found` 발생).
 

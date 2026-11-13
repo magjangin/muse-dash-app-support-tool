@@ -11,36 +11,51 @@ import java.util.regex.Pattern;
 /**
  * config.txt 형식 규칙. 안드로이드·파일 I/O에 의존하지 않아 JVM 단위 테스트로 검증한다.
  *
- * <p>mod.js(src/config.ts)와 같은 규칙으로 읽는다: 키의 공백은 무시하고, 같은 키가 여러 번 있으면
- * 마지막 줄이 이긴다. 저장할 때는 원본에서 해당 키 줄만 바꿔서 앱이 모르는 키(지연·오프셋 등)와
- * 주석을 그대로 둔다.
+ * <p>mod.js(src/config.ts)와 같은 규칙으로 읽는다: 키의 공백은 무시하고 대소문자를 가리지 않으며,
+ * 별칭(예: '크리스마스' = '강제크리스마스')도 같은 키로 본다. 같은 키가 여러 번 있으면 마지막 줄이 이긴다.
+ * 저장할 때는 원본에서 해당 키(별칭 포함) 줄만 바꿔서 앱이 모르는 키(지연·오프셋 등)와 주석을 그대로 둔다.
  */
 public final class ModConfig {
 
-    /** 앱 토글 하나. id는 UI·브리지에서 쓰는 이름, key는 config.txt 의 키. */
+    // OPTIONS보다 먼저 초기화돼야 한다 (Option 생성자가 normKey로 쓴다).
+    private static final Pattern SPACES = Pattern.compile("[\\s\\u00A0\\uFEFF]+");
+
+    /** 앱 토글 하나. id는 UI·브리지에서 쓰는 이름, key는 저장할 때 쓰는 config.txt 키, aliases는 mod.js가 같이 받는 키. */
     public static final class Option {
         public final String id;
         public final String key;
         public final boolean defaultValue;
+        private final List<String> names;
 
-        Option(String id, String key, boolean defaultValue) {
+        Option(String id, String key, boolean defaultValue, String... aliases) {
             this.id = id;
             this.key = key;
             this.defaultValue = defaultValue;
+            List<String> n = new ArrayList<>();
+            n.add(normKey(key));
+            for (String a : aliases) n.add(normKey(a));
+            this.names = Collections.unmodifiableList(n);
+        }
+
+        /** keyOf()가 돌려준 키가 이 토글인가 (대소문자 무시, 별칭 포함). */
+        public boolean matches(String key) {
+            return key != null && names.contains(normKey(key));
         }
     }
 
+    // 키·별칭·기본값은 mod.js src/config.ts의 currentConfig와 맞춘다 (게임 저장소 tools/frida/mod).
     public static final List<Option> OPTIONS = Collections.unmodifiableList(new ArrayList<Option>() {{
-        add(new Option("autoPlay", "오토플레이", false));
-        add(new Option("forcePerfect", "강제퍼펙트", true));
-        add(new Option("blockFever", "피버충전금지", false));
-        add(new Option("enableCinema", "시네마", true));
-        add(new Option("showGhostNotes", "고스트노트보이기", true));
+        add(new Option("autoPlay", "오토플레이", false, "autoplay"));
+        add(new Option("forcePerfect", "강제퍼펙트", true, "forceperfect", "올퍼펙트"));
+        add(new Option("blockFever", "피버충전금지", false, "blockfever", "피버차단"));
+        add(new Option("enableCinema", "시네마", true, "cinema", "bga"));
+        add(new Option("showGhostNotes", "고스트노트보이기", true, "공식곡에서도고스트노트보이기", "ghostnotes"));
+        add(new Option("forceChristmas", "강제크리스마스", false, "크리스마스", "forcechristmas"));
+        add(new Option("enableSpineSkin", "스파인스킨", true, "커스텀스킨", "enablespineskin", "spineskin"));
     }});
 
     private static final char BOM = (char) 0xFEFF;
     private static final char NBSP = (char) 0x00A0;
-    private static final Pattern SPACES = Pattern.compile("[\\s\\u00A0\\uFEFF]+");
     private static final List<String> TRUE_WORDS = Arrays.asList("true", "1", "on", "yes", "활성화", "켜기", "켜짐");
     private static final List<String> FALSE_WORDS = Arrays.asList("false", "0", "off", "no", "비활성화", "끄기", "끔");
 
@@ -80,15 +95,24 @@ public final class ModConfig {
         return map;
     }
 
-    /** 앱 토글 값. 파일에 없거나 읽을 수 없는 값이면 기본값. 키는 Option.id. */
+    /** 앱 토글 값. 파일에 없거나 읽을 수 없는 값이면 기본값. 키는 Option.id. 별칭 줄도 읽고, 마지막 줄이 이긴다. */
     public static Map<String, Boolean> resolve(String text) {
-        Map<String, Boolean> parsed = parse(text);
-        Map<String, Boolean> out = new LinkedHashMap<>();
-        for (Option o : OPTIONS) {
-            Boolean v = parsed.get(o.key);
-            out.put(o.id, v != null ? v : o.defaultValue);
+        Map<String, Boolean> out = defaults();
+        if (text == null) return out;
+        for (String line : splitLines(text)) {
+            Option o = optionForKey(keyOf(line));
+            if (o == null) continue;
+            Boolean b = parseBool(line.substring(line.indexOf('=') + 1));
+            if (b != null) out.put(o.id, b);
         }
         return out;
+    }
+
+    /** config.txt 키(별칭 포함) → 토글. 모르는 키는 null. */
+    static Option optionForKey(String key) {
+        if (key == null) return null;
+        for (Option o : OPTIONS) if (o.matches(key)) return o;
+        return null;
     }
 
     public static Map<String, Boolean> defaults() {
@@ -98,7 +122,7 @@ public final class ModConfig {
     }
 
     /**
-     * raw에 values를 반영한 새 텍스트. 해당 키 줄만 바꾸고, 없는 키는 끝에 붙인다.
+     * raw에 values를 반영한 새 텍스트. 해당 키 줄(별칭 줄 포함)을 '정식키=값'으로 바꾸고, 없는 키는 끝에 붙인다.
      * raw가 비어 있으면 주석이 달린 기본 파일을 만든다.
      */
     public static String apply(String raw, Map<String, Boolean> values) {
@@ -108,7 +132,7 @@ public final class ModConfig {
             boolean value = valueOf(values, o);
             boolean found = false;
             for (int i = 0; i < lines.size(); i++) {
-                if (o.key.equals(keyOf(lines.get(i)))) {
+                if (o.matches(keyOf(lines.get(i)))) {
                     lines.set(i, o.key + "=" + value);
                     found = true;
                 }
@@ -139,12 +163,29 @@ public final class ModConfig {
                 + "#  [2] 연출\n"
                 + "# ----------------------------------------------------------------------------\n"
                 + "시네마=" + valueOf(values, option("enableCinema")) + "\n"
-                + "고스트노트보이기=" + valueOf(values, option("showGhostNotes")) + "\n";
+                + "고스트노트보이기=" + valueOf(values, option("showGhostNotes")) + "\n"
+                + "\n"
+                + "# ----------------------------------------------------------------------------\n"
+                + "#  [3] 테스트용\n"
+                + "#  - 강제크리스마스 : 날짜와 상관없이 공식 곡 5번 씬의 배경·보스를 크리스마스 판으로 바꿉니다.\n"
+                + "# ----------------------------------------------------------------------------\n"
+                + "강제크리스마스=" + valueOf(values, option("forceChristmas")) + "\n"
+                + "\n"
+                + "# ----------------------------------------------------------------------------\n"
+                + "#  [4] 스킨\n"
+                + "#  - 스파인스킨 : <게임 files>/skin test/ 의 커스텀 Spine 스킨을 씌웁니다.\n"
+                + "# ----------------------------------------------------------------------------\n"
+                + "스파인스킨=" + valueOf(values, option("enableSpineSkin")) + "\n";
     }
 
     private static boolean valueOf(Map<String, Boolean> values, Option o) {
         Boolean v = values == null ? null : values.get(o.id);
         return v != null ? v : o.defaultValue;
+    }
+
+    /** 키 비교용: 공백을 지우고 소문자로 (mod.js의 replace(/\s+/g, "").toLowerCase()). */
+    static String normKey(String key) {
+        return SPACES.matcher(key).replaceAll("").toLowerCase(java.util.Locale.ROOT);
     }
 
     /** "\r\n"을 "\n"으로 바꾼 뒤 줄로 나눈다. 끝의 빈 줄도 남긴다(JS split과 같다). */
