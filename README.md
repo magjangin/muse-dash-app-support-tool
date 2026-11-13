@@ -98,7 +98,7 @@ v2.0.0부터 일반 **Gradle 프로젝트**입니다. Android Studio로 폴더�
 ```powershell
 # 단위 테스트(JVM) + lint + 배포용 APK
 .\gradlew.bat testDebugUnitTest lintDebug assembleRelease
-# 산출물: app/build/outputs/apk/release/app-release.apk (약 47KB)
+# 산출물: app/build/outputs/apk/release/app-release.apk (약 50KB)
 
 # 실기기 계측 테스트 (권한·데이터를 지우지 않도록 Gradle의 connectedAndroidTest 대신 직접 설치해 실행)
 .\gradlew.bat assembleDebug assembleDebugAndroidTest
@@ -127,8 +127,8 @@ adb shell "content update --uri content://media/external/file --bind owner_packa
 # 1. app/build.gradle.kts의 versionCode / versionName을 올리고 CHANGELOG.md 작성
 # 2. 빌드 후 버전이 붙은 이름으로 GitHub 릴리스에 업로드
 .\gradlew.bat testDebugUnitTest lintDebug assembleRelease
-Copy-Item app\build\outputs\apk\release\app-release.apk MuseDash_Mod_Assistant-v2.0.0.apk
-gh release create v2.0.0 MuseDash_Mod_Assistant-v2.0.0.apk --title "v2.0.0" --notes-file <릴리스 노트 파일>
+Copy-Item app\build\outputs\apk\release\app-release.apk MuseDash_Mod_Assistant-v2.0.1.apk
+gh release create v2.0.1 MuseDash_Mod_Assistant-v2.0.1.apk --title "v2.0.1" --notes-file <릴리스 노트 파일>
 ```
 
 ---
@@ -137,10 +137,13 @@ gh release create v2.0.0 MuseDash_Mod_Assistant-v2.0.0.apk --title "v2.0.0" --no
 
 ```
 app/src/main/
- ├── assets/                 화면 (WebView): index.html · app.css · app.js
+ ├── assets/                 화면 (WebView): index.html · app.css · js/
+ │    └── js/                core(브리지·헬퍼·확인 창·상태) · config · songs · store(hwa.moe) · xapk · main(탭·이벤트·시작)
  └── java/com/hwa/musedash/assistant/
       ├── MainActivity       WebView, 자켓 이미지 주소(https://assistant.local/cover/<곡>)
-      ├── AndroidBridge      window.AndroidBridge — JSON 변환과 백그라운드 스레드만 담당
+      ├── AndroidBridge      window.AndroidBridge — 기능 클래스 호출과 백그라운드 스레드만 담당
+      ├── BridgeJson         브리지가 화면에 돌려주는 JSON 모양
+      ├── AppStatus          앱·게임 버전, 저장소 권한 확인·요청
       ├── SongProvider       /MuseDash/hwa 를 게임에게만 읽기 전용으로 공개 (mod.js가 시작 시 가져감)
       ├── GenericFileProvider  시스템 설치 화면에 APK 넘기기
       ├── config/            ModConfig(config.txt 규칙, 순수 Java) · ConfigRepository(파일·소유자)

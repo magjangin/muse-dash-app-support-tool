@@ -120,6 +120,12 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- 순서가 중요하다: core가 공통 헬퍼·상태를 만들고 main이 마지막에 화면을 시작한다. -->
+  <script src="js/core.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/songs.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/xapk.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

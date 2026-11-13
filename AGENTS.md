@@ -22,13 +22,13 @@
 - **v2.0.0 (2026-11-12)부터 일반 Gradle 프로젝트** (`app/` 모듈, AGP 9.5.1, Gradle 9.9.1 래퍼, compileSdk 36, minSdk 26, targetSdk 34, Java 17). Android Studio 2026.2로 연다.
   - 빌드 PC 환경: Android SDK `H:\Android\Sdk` (cmdline-tools, platform-tools 37, platforms;android-36, build-tools 36.1.0, 사용자 환경 변수 `ANDROID_HOME`), JDK 21 Temurin, Android Studio `C:\Program Files\Android\Android Studio`. `local.properties`(커밋 안 함)에 `sdk.dir=H\:/Android/Sdk`.
   - v1.0.x의 `build_apk.py`(aapt2+javac+d8+uber-apk-signer)와 프로젝트 루트 `sdk/`(무시 목록)는 더 쓰지 않는다. `sdk/`는 지워도 된다.
-- **UI는 WebView 유지** (사용자 결정: Compose 재작성 대신 구조 정리). `assets/index.html`(뼈대) + `app.css` + `app.js`. 서버·파일에서 온 문자열은 `el()` 헬퍼로 `textContent`에만 넣는다 — v1.0.x는 hwa.moe 제목·태그를 `innerHTML`로 넣어, 서버 데이터가 파일 삭제·설치까지 하는 브리지를 부를 수 있었다.
-- **네이티브는 기능별 클래스, `AndroidBridge`는 얇은 JS 창구**: JSON 변환과 스레드 분리만 한다. 결과는 `MainActivity.callJs(fn, args...)`가 `JSONObject.quote`로 인코딩해 `window.on*`를 부른다.
+- **UI는 WebView 유지** (사용자 결정: Compose 재작성 대신 구조 정리). `assets/index.html`(뼈대) + `app.css` + `js/*.js`(v2.0.1에서 `app.js`를 나눔: `core`(브리지 호출·`el()`·확인 창·`state`) → `config` → `songs` → `store` → `xapk` → `main`(탭·이벤트·시작) 순서로 읽는 일반 `<script>`). ES 모듈은 `file:///android_asset`에서 CORS로 막힐 수 있어 쓰지 않고, 최상위 `const`/`function`을 전역으로 공유한다. 실기기 테스트가 전역 `confirmBox`를 부르므로 이름을 바꾸면 테스트도 고친다. 서버·파일에서 온 문자열은 `el()` 헬퍼로 `textContent`에만 넣는다 — v1.0.x는 hwa.moe 제목·태그를 `innerHTML`로 넣어, 서버 데이터가 파일 삭제·설치까지 하는 브리지를 부를 수 있었다.
+- **네이티브는 기능별 클래스, `AndroidBridge`는 얇은 JS 창구**: 스레드 분리와 결과 전달만 한다. JSON 모양은 `BridgeJson`, 앱·게임 버전과 저장소 권한은 `AppStatus`(v2.0.1). 결과는 `MainActivity.callJs(fn, args...)`가 `JSONObject.quote`로 인코딩해 `window.on*`를 부른다.
   - `config/ModConfig`(config.txt 규칙, 순수 Java) · `config/ConfigRepository`(파일·MediaStore 소유자)
   - `songs/SongLibrary`(목록·삭제·자켓) · `songs/SongDownloader`(hwa.moe ZIP) · `songs/SafePaths`(폴더 이름·zip slip)
   - `xapk/XapkRules`(순수) · `xapk/PackageInstaller` · `records/RecordResetQueue`
   - 순수 Java로 뺀 규칙은 JVM 단위 테스트(`app/src/test`)로, 기기 의존 동작은 실기기 테스트(`app/src/androidTest`)로 검증한다.
-- **앱 본체는 외부 라이브러리 0개** (androidx 없음 → release APK 약 47KB). AGP 9의 내장 Kotlin이 kotlin-stdlib(약 2MB)를 넣어서 `gradle.properties`에 `android.builtInKotlin=false`를 둔다. FileProvider도 androidx 대신 `GenericFileProvider`(캐시·공용 저장소 아래 파일만 엶).
+- **앱 본체는 외부 라이브러리 0개** (androidx 없음 → release APK 약 50KB). AGP 9의 내장 Kotlin이 kotlin-stdlib(약 2MB)를 넣어서 `gradle.properties`에 `android.builtInKotlin=false`를 둔다. FileProvider도 androidx 대신 `GenericFileProvider`(캐시·공용 저장소 아래 파일만 엶).
 - **서명 키 고정**: `signing/uber-debug.keystore` = v1.0.x를 서명한 uber-apk-signer 내장 공개 debug 키(alias `androiddebugkey`, 암호 `android`, SHA-256 `1e08a903…5953`). debug·release 모두 이 키. 바꾸면 기존 사용자가 앱을 지워야 해서 설정 예약·권한이 날아간다.
 - **targetSdk 34 유지**: 35+는 edge-to-edge 강제 등 동작이 바뀌고, 사이드로드 전용이라 올릴 이득이 없다.
 - **`QUERY_ALL_PACKAGES` 제거** → `<queries>`에 게임 패키지와 `INSTALL_PACKAGE` 인텐트만. 게임 설치 확인·실행·`grantUriPermission`, 시스템 설치기 찾기(#13) 모두 실기로 확인.
@@ -71,7 +71,7 @@
 ```powershell
 # 1. 빌드 + 단위 테스트 + lint (JAVA_HOME = JDK 17+)
 .\gradlew.bat testDebugUnitTest lintDebug assembleRelease
-# 산출물: app\build\outputs\apk\release\app-release.apk (약 47KB)
+# 산출물: app\build\outputs\apk\release\app-release.apk (약 50KB)
 
 # 2. 실기기 계측 테스트 — connectedAndroidTest는 쓰지 않는다 (아래 Dead End #15)
 .\gradlew.bat assembleDebug assembleDebugAndroidTest
@@ -97,6 +97,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
 ```
 - 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기).
 - 2026-11-12 결과: 단위 34/34, 실기기 7/7. 실기 수동 확인: 설정 탭 연동 표시, hwa.moe 받기(119MB)→내 곡 표시→삭제, 가짜 XAPK(비서 앱 자신의 APK+3MB OBB)로 OBB 배치→시스템 설치기, 앱의 [실행]으로 켠 게임의 `mod.log`에 `assistant-sync songs:5 failed:0`, `config-loaded source:/MuseDash/config.txt`.
+- 2026-11-13 v2.0.1(코드 분할만) 결과: 단위 34/34, lint 통과, 실기기 7/7, release 50,805바이트. 실기에 release 설치 후 실행 — WebView 콘솔 오류 없음.
 - PC에 Nox가 떠 있으면 `nox_adb`(서버 v36)가 계속 adb 서버를 재시작하므로, 플랫폼툴 `adb`(v41) 대신 반드시 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`를 쓴다 (버전 충돌로 `device not found` 발생).
 
 ---
