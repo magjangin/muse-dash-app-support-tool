@@ -15,7 +15,7 @@
   - 공용 경로: `/storage/emulated/0/MuseDash/hwa/`
   - 앱 전용 경로: `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`
 - **XAPK 검색 경로**: `/storage/emulated/0/Download/`, `/storage/emulated/0/MuseDash/`
-- **현재 비서 앱 버전**: v2.2.0 (versionCode 9, 2026-11-14, 내 곡 탭이 게임과 같은 곡 규칙 사용). v2.1.0(versionCode 8, 토글 2개)과 함께 main에 머지했지만 **태그·GitHub 릴리스는 아직 없다**(GitHub Latest는 v2.0.1). 기기에는 v2.2.0 release 빌드가 깔려 있다.
+- **현재 비서 앱 버전**: v2.2.0 (versionCode 9, 2026-11-14, 내 곡 탭이 게임과 같은 곡 규칙 사용). **GitHub Latest = v2.2.0** (https://github.com/magjangin/muse-dash-app-support-tool/releases/tag/v2.2.0, 태그 `v2.2.0` → 머지 커밋 `0de7a61`, 첨부 `MuseDash_Mod_Assistant-v2.2.0.apk` 58,301 B, SHA-256 `2367bcc9…af7b`, 서명 인증서 `1e08a903…5953`, latest 링크로 다시 받아 해시 일치). v2.1.0(versionCode 8, 토글 2개)은 태그·릴리스 없이 v2.2.0 릴리스 노트에 함께 적었다. 기기에는 v2.2.0 release 빌드(브랜치 빌드, 소스 같음)가 깔려 있다.
 - **게임 버전과 고정 여부**:
   - 기기의 모드 게임 `com.prpr.musedash.mod`: versionName 6.8.0, versionCode 632, targetSdk 36. adb로 사이드로드한 복제 패키지라(`installerPackageName=null`, 마지막 갱신 2026-11-01) 스토어 자동 업데이트를 받지 않는다. 사실상 고정이다.
   - Steam Build ID·DepotDownloader·`.acf` 패치 차단은 안드로이드라 해당 없다. 정품 `com.prpr.musedash`(Play 설치본)는 Play 자동 업데이트를 꺼 둬야 한다. 원본 APK 해시와 OBB 크기는 게임 저장소 AGENTS.md ①에 있다.
@@ -171,7 +171,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
 - 2026-11-13 v2.0.1(코드 분할만) 결과: 단위 34/34, lint 통과, 실기기 7/7. 브랜치 빌드(50,805바이트)를 실기에 깔아 실행했고 WebView 콘솔 오류가 없었다. 릴리스 첨부 파일은 머지 뒤 main에서 다시 빌드한 것이다(50,865바이트, 소스는 같고 바이트만 다름).
 - PC에 Nox가 떠 있으면 `nox_adb`(서버 v36)가 계속 adb 서버를 재시작하므로, 플랫폼툴 `adb`(v41) 대신 반드시 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`를 쓴다 (버전 충돌로 `device not found` 발생).
 
-### 릴리스 절차 (v2.0.0·v2.0.1에서 쓴 순서)
+### 릴리스 절차 (v2.0.0·v2.0.1·v2.2.0에서 쓴 순서)
 ```powershell
 # 1. 브랜치에서 versionCode/versionName 올리기 + CHANGELOG.md·README 릴리스 명령·이 문서 갱신 → 위 빌드·테스트 전부 통과
 git switch -c refactor/<이름>; git commit ...; git push -u origin refactor/<이름>
