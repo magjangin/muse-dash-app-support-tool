@@ -85,7 +85,7 @@ const state = {
   downloads: {},     // albumId -> percent (-1 = 크기 모름) 또는 'queued'
   downloadQueue: [], // 아직 시작 안 한 앨범(차례대로)
   downloadErrors: {}, // albumId -> 마지막 실패 메시지
-  storeInstalledNow: 0, // 이번에 받은 곡 수(게임 다시 켜기 안내용)
+  storeInstalledNow: new Set(), // 이번에 받은 앨범 id(게임 다시 켜기 안내용, 지운 곡은 세지 않음)
   deleting: {},    // folder(lower) -> true
   packages: [],
   pkgStatus: {},   // path -> {msg, pct, busy}

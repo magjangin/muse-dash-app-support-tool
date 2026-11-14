@@ -112,11 +112,18 @@ public class MainActivityDeviceTest {
 
             // 모두 받기 줄이 보이고, 대기열에 넣었다 빼면 원래대로
             assertEquals("true", eval(sc, "document.getElementById('storeBulk').textContent.includes('3곡 모두 받기')"));
-            eval(sc, "enqueue(state.albums[0]); renderStore(); true");
+            eval(sc, "enqueue(state.albums[0]); enqueue(state.albums[1]); state.downloads.t2 = 40; renderStore(); true");
+            assertEquals("true", eval(sc, "document.getElementById('storeBulk').textContent.includes('받는 중 1곡 · 대기 1곡')"));
+            eval(sc, "delete state.downloads.t2; state.downloadQueue = state.downloadQueue.filter(a => a.id !== 't2'); renderStore(); true");
             assertEquals("\"대기 중 ✕\"", eval(sc, "document.querySelector('[data-album=t1] .item-actions button').textContent"));
             eval(sc, "document.querySelector('[data-album=t1] .item-actions button').click()");
             assertEquals("\"⬇ 받기\"", eval(sc, "document.querySelector('[data-album=t1] .item-actions button').textContent"));
             assertEquals("0", eval(sc, "state.downloadQueue.length"));
+
+            // '새로 받은 곡' 안내는 지금 기기에 있는 곡만 센다: 받았다 지운 곡(여기선 기기에 없는 가짜 앨범)은 빠진다
+            eval(sc, "state.storeInstalledNow.add('t1'); renderStore(); true");
+            assertEquals("false", eval(sc, "document.getElementById('storeBulk').textContent.includes('새로 받은')"));
+            eval(sc, "state.storeInstalledNow.clear(); true");
 
             eval(sc, "document.querySelector('[data-tab=tab-config]').click()");
         }
