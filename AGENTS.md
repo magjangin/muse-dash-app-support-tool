@@ -15,7 +15,7 @@
   - 공용 경로: `/storage/emulated/0/MuseDash/hwa/`
   - 앱 전용 경로: `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`
 - **XAPK 검색 경로**: `/storage/emulated/0/Download/`, `/storage/emulated/0/MuseDash/`
-- **현재 비서 앱 버전**: v2.3.0 (versionCode 10, 2026-11-14, hwa.moe 탭 검색·태그·정렬·모두 받기·받기 대기열). 기기에는 v2.3.0 release 빌드(브랜치 빌드, 소스 같음)가 깔려 있다. 이전 GitHub 릴리스 v2.2.0(versionCode 9, 내 곡 탭이 게임과 같은 곡 규칙 사용): 태그 `v2.2.0` → 머지 커밋 `0de7a61`, 첨부 58,301 B, SHA-256 `2367bcc9…af7b`, 서명 인증서 `1e08a903…5953`. v2.1.0(versionCode 8, 토글 2개)은 태그·릴리스 없이 v2.2.0 릴리스 노트에 함께 적었다.
+- **현재 비서 앱 버전**: v2.3.0 (versionCode 10, 2026-11-14, hwa.moe 탭 검색·태그·정렬·모두 받기·받기 대기열). **GitHub Latest = v2.3.0** (https://github.com/magjangin/muse-dash-app-support-tool/releases/tag/v2.3.0, 태그 `v2.3.0` → 머지 커밋 `fc6010c`, 첨부 `MuseDash_Mod_Assistant-v2.3.0.apk` 62,129 B, SHA-256 `db507736…cb01`, 서명 인증서 `1e08a903…5953`, latest 링크로 다시 받아 해시 일치). 기기에는 v2.3.0 release 빌드(브랜치 빌드, 소스 같음)가 깔려 있다. 이전 GitHub 릴리스 v2.2.0(versionCode 9, 내 곡 탭이 게임과 같은 곡 규칙 사용): 태그 `v2.2.0` → 머지 커밋 `0de7a61`, 첨부 58,301 B, SHA-256 `2367bcc9…af7b`, 서명 인증서 `1e08a903…5953`. v2.1.0(versionCode 8, 토글 2개)은 태그·릴리스 없이 v2.2.0 릴리스 노트에 함께 적었다.
 - **게임 버전과 고정 여부**:
   - 기기의 모드 게임 `com.prpr.musedash.mod`: versionName 6.8.0, versionCode 632, targetSdk 36. adb로 사이드로드한 복제 패키지라(`installerPackageName=null`, 마지막 갱신 2026-11-01) 스토어 자동 업데이트를 받지 않는다. 사실상 고정이다.
   - Steam Build ID·DepotDownloader·`.acf` 패치 차단은 안드로이드라 해당 없다. 정품 `com.prpr.musedash`(Play 설치본)는 Play 자동 업데이트를 꺼 둬야 한다. 원본 APK 해시와 OBB 크기는 게임 저장소 AGENTS.md ①에 있다.
