@@ -2,6 +2,7 @@ package com.hwa.musedash.assistant;
 
 import com.hwa.musedash.assistant.config.ConfigRepository;
 import com.hwa.musedash.assistant.records.RecordResetQueue;
+import com.hwa.musedash.assistant.songs.HwaManifest;
 import com.hwa.musedash.assistant.songs.SongInfo;
 
 import org.json.JSONArray;
@@ -49,7 +50,12 @@ final class BridgeJson {
         return o.toString();
     }
 
-    /** [{folder, title, artist, bmsCount, hasMusic, hasVideo, hasCover, pendingReset}] */
+    /**
+     * [{folder, title, artist, bmsCount, hasMusic, hasVideo, hasCover, pendingReset,
+     *   levels: [난이도1..5 레벨 또는 null], difficultyCharts: 난이도별 채보 지정 수, christmas: bool,
+     *   overrides: {autoPlay, blockFever, cinema, showGhostNotes, fixDt} 중 info.txt에 값이 있는 것만,
+     *   gameSkip: 게임이 건너뛰는 이유 또는 null, warnings: [문자열]}]
+     */
     static String songs(List<SongInfo> songs, Set<String> pendingResets) {
         JSONArray arr = new JSONArray();
         for (SongInfo s : songs) {
@@ -63,11 +69,34 @@ final class BridgeJson {
                 o.put("hasVideo", s.hasVideo);
                 o.put("hasCover", s.cover != null);
                 o.put("pendingReset", RecordResetQueue.isPending(pendingResets, s.folder));
+                JSONArray levels = new JSONArray();
+                int charts = 0;
+                for (int d = 1; d <= HwaManifest.MAX_DIFFICULTY; d++) {
+                    Integer lv = s.level(d);
+                    levels.put(lv == null ? JSONObject.NULL : lv);
+                    if (s.difficultyCharts[d] != null) charts++;
+                }
+                o.put("levels", levels);
+                o.put("difficultyCharts", charts);
+                o.put("christmas", Boolean.TRUE.equals(s.manifest.christmasScene));
+                JSONObject overrides = new JSONObject();
+                putIfSet(overrides, "autoPlay", s.manifest.autoPlay);
+                putIfSet(overrides, "blockFever", s.manifest.blockFever);
+                putIfSet(overrides, "cinema", s.manifest.cinema);
+                putIfSet(overrides, "showGhostNotes", s.manifest.showGhostNotes);
+                putIfSet(overrides, "fixDt", s.manifest.fixDtToRecommended);
+                o.put("overrides", overrides);
+                o.put("gameSkip", s.gameSkipReason == null ? JSONObject.NULL : s.gameSkipReason);
+                o.put("warnings", new JSONArray(s.warnings));
                 arr.put(o);
             } catch (Exception ignored) {
             }
         }
         return arr.toString();
+    }
+
+    private static void putIfSet(JSONObject o, String key, Boolean value) throws org.json.JSONException {
+        if (value != null) o.put(key, value.booleanValue());
     }
 
     static String strings(Collection<String> values) {

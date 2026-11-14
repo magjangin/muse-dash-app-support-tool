@@ -6,7 +6,7 @@
 ![Game](https://img.shields.io/badge/Target-Muse%20Dash%20v6.8.0%20(IL2CPP%20arm64)-ff2a7a?style=for-the-badge)
 ![UI](https://img.shields.io/badge/UI-Fluent%20Acrylic%20WebView-00e5ff?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Store-hwa.moe%20Custom%20Sync-purple?style=for-the-badge)
-![Build](https://img.shields.io/badge/Build-Zero--Dependency%20Python%20Pipeline-blue?style=for-the-badge&logo=python)
+![Build](https://img.shields.io/badge/Build-Gradle%20%C2%B7%20Zero--Dependency%20APK-blue?style=for-the-badge&logo=gradle)
 
 **안드로이드 모바일 실기기 환경에서 뮤즈대시 모딩(`com.prpr.musedash.mod`)을 실시간으로 제어하고, 커스텀 곡 주입 및 XAPK 패키지를 완벽 관리하는 네이티브 컴패니언 애플리케이션입니다.**
 
@@ -28,6 +28,7 @@
 |---|---|
 | [설치 가이드](docs/INSTALL.md) | APK 설치, 권한, 게임 설정 연동(adb 1회), mod.js 최신화 |
 | [사용 설명서](docs/USAGE.md) | 탭별 기능, 토글과 `config.txt` 키, 파일 위치 |
+| [곡 폴더와 info.txt 규칙](docs/SONG_FOLDER.md) | 게임이 곡 파일을 고르는 규칙, info.txt 키 목록, 곡별 설정 우선순위 |
 | [문제 해결](docs/TROUBLESHOOTING.md) | 설정 미반영, 곡 미표시, adb 버전 충돌 등 |
 | [변경 이력](CHANGELOG.md) | 버전별 변경 사항 |
 
@@ -80,10 +81,16 @@
 * 게임이 시작될 때 모드(`mod.js`)가 목록을 받아 새 파일만 게임 전용 폴더로 복사하고, 비서 앱에서 지운 곡은 게임 폴더에서도 지웁니다.
 * 곡 가져오기를 지원하는 [muse-dash-phone](https://github.com/magjangin/muse-dash-phone) `mod.js`가 필요합니다. 자세한 내용은 [사용 설명서](docs/USAGE.md#곡이-게임에-들어가는-방식)를 보세요.
 
-### 4. 📦 XAPK / APK 패키지 인스톨러 (XAPK Manager)
+### 4. 🎵 내 곡 — 게임과 같은 규칙으로 곡 점검 (v2.2.0)
+* 곡 폴더를 게임 모드(`mod.js` `src/hwa/manifest.ts`·`chartFiles.ts`·`library.ts`)와 **같은 규칙**으로 읽습니다. 앱에 보이는 제목·아티스트·자켓·BGM이 게임과 같습니다.
+* 레벨, 난이도별 채보, 크리스마스 배경, info.txt 곡별 설정(오토·시네마·고스트·권장표 등)을 배지로 보여 줍니다.
+* 게임이 건너뛸 곡(info 파일·채보 없음)은 **게임에 안 보임**으로, 못 찾는 난이도별 채보·음악 없음·모르는 info.txt 항목은 주황 경고로 알려 줍니다. 규칙은 [곡 폴더와 info.txt 규칙](docs/SONG_FOLDER.md)에 있습니다.
+* 곡 삭제(목록에서 바로 빠짐), 곡별·전체 플레이 기록 초기화 예약.
+
+### 5. 📦 XAPK / APK 패키지 인스톨러 (XAPK Manager)
 * 다운로드 폴더 내의 `.xapk` / `.apk` 파일 자동 스캔.
 * XAPK 파일 감지 시 내부 ZIP 스트림에서 `base.apk`를 캐시로 임시 추출하고 `GenericFileProvider`를 통해 시스템 설치 프로세스 즉각 호출.
-* 대용량 확장 에셋(`*.obb`) 존재 시 `/sdcard/Android/obb/com.prpr.musedash.mod/` 경로로 자동 추출 및 배치.
+* 대용량 확장 에셋(`*.obb`)은 XAPK 안의 경로(`Android/obb/<패키지>/…`) 그대로, 그런 경로가 아니면 `manifest.json`의 패키지 폴더로 배치합니다.
 
 ---
 
@@ -101,7 +108,7 @@ v2.0.0부터 일반 **Gradle 프로젝트**입니다. Android Studio로 폴더�
 ```powershell
 # 단위 테스트(JVM) + lint + 배포용 APK
 .\gradlew.bat testDebugUnitTest lintDebug assembleRelease
-# 산출물: app/build/outputs/apk/release/app-release.apk (약 50KB)
+# 산출물: app/build/outputs/apk/release/app-release.apk (약 58KB)
 
 # 실기기 계측 테스트 (권한·데이터를 지우지 않도록 Gradle의 connectedAndroidTest 대신 직접 설치해 실행)
 .\gradlew.bat assembleDebug assembleDebugAndroidTest
@@ -130,8 +137,9 @@ adb shell "content update --uri content://media/external/file --bind owner_packa
 # 1. app/build.gradle.kts의 versionCode / versionName을 올리고 CHANGELOG.md 작성
 # 2. 빌드 후 버전이 붙은 이름으로 GitHub 릴리스에 업로드
 .\gradlew.bat testDebugUnitTest lintDebug assembleRelease
-Copy-Item app\build\outputs\apk\release\app-release.apk MuseDash_Mod_Assistant-v2.0.1.apk
-gh release create v2.0.1 MuseDash_Mod_Assistant-v2.0.1.apk --title "v2.0.1" --notes-file <릴리스 노트 파일>
+Copy-Item app\build\outputs\apk\release\app-release.apk MuseDash_Mod_Assistant-vX.Y.Z.apk
+gh release create vX.Y.Z MuseDash_Mod_Assistant-vX.Y.Z.apk --title "vX.Y.Z" --notes-file <BOM 없는 UTF-8 노트 파일> --verify-tag
+# 태그는 PR 머지 커밋에 붙입니다. 전체 절차는 AGENTS.md 4절 '릴리스 절차'.
 ```
 
 ---
@@ -150,15 +158,17 @@ app/src/main/
       ├── SongProvider       /MuseDash/hwa 를 게임에게만 읽기 전용으로 공개 (mod.js가 시작 시 가져감)
       ├── GenericFileProvider  시스템 설치 화면에 APK 넘기기
       ├── config/            ModConfig(config.txt 규칙, 순수 Java) · ConfigRepository(파일·소유자)
-      ├── songs/             SongLibrary(목록·삭제·자켓) · SongDownloader(hwa.moe ZIP) · SafePaths
+      ├── songs/             SongLibrary(목록·삭제·자켓) · SongInfo(곡 하나) · SongDownloader(hwa.moe ZIP) · SafePaths
+      │                      HwaManifest · ChartFiles · TextNormalizer — 게임 mod.js 곡 규칙의 Java 사본(순수 Java)
       ├── xapk/              XapkRules(OBB 위치 규칙) · PackageInstaller(XAPK 풀기·설치)
       └── records/           RecordResetQueue(기록 초기화 예약)
-app/src/test/                JVM 단위 테스트 (config 규칙, ZIP 경로 안전, XAPK 규칙 등)
+app/src/test/                JVM 단위 테스트 (config 규칙, info.txt·채보 고르기 규칙, ZIP 경로 안전, XAPK 규칙 등)
 app/src/androidTest/         실기기 테스트 (SongProvider 규약, config 소유자 유지, 화면)
 ```
 
 - 앱 본체는 외부 라이브러리 없이 Android SDK만 씁니다. 테스트 라이브러리는 APK에 들어가지 않습니다.
 - 서버(hwa.moe)·파일에서 온 문자열은 화면에 `textContent`로만 넣습니다 (HTML로 해석되지 않음).
+- `config.txt` 키(`ModConfig`)와 곡 규칙(`HwaManifest`·`ChartFiles`)은 게임 모드 소스의 사본입니다. 게임 쪽 규칙이 바뀌면 같이 고칩니다. 짝 표는 [AGENTS.md](AGENTS.md) 3-2절.
 - 자세한 설계 이유와 실패 기록은 [AGENTS.md](AGENTS.md)에 있습니다.
 
 ---

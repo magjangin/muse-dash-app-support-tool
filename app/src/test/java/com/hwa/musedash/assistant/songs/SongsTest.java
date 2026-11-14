@@ -17,6 +17,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -57,40 +58,127 @@ public class SongsTest {
         }
     }
 
+    // ---- HwaManifest (게임 src/hwa/manifest.ts와 같은 규칙)
+
+    @Test
+    public void manifest_keysByContainsRule_firstSeparatorWins() {
+        HwaManifest m = HwaManifest.parse("\uFEFF커스텀 곡 제목 = Re:Zero 테마\n커스텀 아티스트: 화평\n"
+                + "곡 이름 = 원곡\n내가 가져올 uid : 0-4\n씬 번호 = 5\n난이도1 = 3\n난이도 2 : 7\nDifficulty3=null\n");
+        assertEquals("Re:Zero 테마", m.customTitle);
+        assertEquals("원곡", m.title);
+        assertEquals("Re:Zero 테마", m.displayTitle());
+        assertEquals("화평", m.displayArtist());
+        assertEquals("0-4", m.uid);
+        assertEquals(Integer.valueOf(5), m.scene);
+        assertEquals(Integer.valueOf(3), m.difficulty[1]);
+        assertEquals(Integer.valueOf(7), m.difficulty[2]);
+        assertNull(m.difficulty[3]);
+        assertTrue(m.unknownKeys.isEmpty());
+    }
+
+    @Test
+    public void manifest_orderMatters_difficultyBmsChristmasAndroidDelay() {
+        HwaManifest m = HwaManifest.parse("난이도1 bms: easy.bms\n난이도 3 채보 = hard.BMS\n크리스마스 배경 = 활성화\n"
+                + "christmas scene: on\nandroid delay = -0.05\ndelay = 0.12s\noffset=+30\n고스트 노트 보이기 = 끔\n"
+                + "권장표 = 켜기\n오토 = maybe\nbpm = 180\n");
+        assertEquals("easy.bms", m.difficultyBms[1]);
+        assertEquals("hard.BMS", m.difficultyBms[3]);
+        assertNull(m.difficulty[1]);          // 'bms' 줄이 레벨 숫자로 가지 않는다
+        assertEquals(Boolean.TRUE, m.christmasScene);
+        assertNull(m.scene);                  // 'christmas scene'이 씬 번호로 가지 않는다
+        assertEquals(-0.05, m.androidDelay, 1e-9);
+        assertEquals(0.12, m.delay, 1e-9);    // parseFloat처럼 앞쪽 숫자만
+        assertEquals(30.0, m.offset, 1e-9);
+        assertEquals(Boolean.FALSE, m.showGhostNotes);
+        assertEquals(Boolean.TRUE, m.fixDtToRecommended);
+        assertNull(m.autoPlay);               // 모르는 값은 null(전역 설정을 따름)
+        assertEquals(java.util.Collections.singletonList("bpm"), m.unknownKeys);
+    }
+
+    @Test
+    public void manifest_commentsAndContractions() {
+        HwaManifest m = HwaManifest.parse("// 주석\ntitle = Don ' t Stop  // 끝 주석\nartist = https://a.b/c\nscene=\n");
+        assertEquals("Don't Stop", m.title);
+        assertEquals("https://a.b/c", m.artist);   // 앞에 공백 없는 '//'는 주석이 아니다
+        assertNull(m.scene);
+        assertEquals("you're it's DON'T", TextNormalizer.normalizeEnglishContractions("you'  re it \u2019 s DON ' T"));
+    }
+
+    // ---- ChartFiles (게임 src/hwa/chartFiles.ts·library.ts와 같은 규칙)
+
+    @Test
+    public void chartFiles_tempFilesAndDefaultBms() {
+        assertTrue(ChartFiles.isTempFile("~a.bms"));
+        assertTrue(ChartFiles.isTempFile("temp.bms"));
+        assertTrue(ChartFiles.isTempFile("tmp_1.bms"));
+        assertTrue(ChartFiles.isTempFile(".bms"));
+        assertFalse(ChartFiles.isTempFile("tempo.bms"));
+        assertEquals("main.bms", ChartFiles.pickDefaultBms(Arrays.asList("b.bms", "main.bms", "a.bms"), null));
+        assertEquals("a.bms", ChartFiles.pickDefaultBms(Arrays.asList("b.bms", "a.bms", "temp.bms"), null));
+        // 난이도에 지정된 파일은 다른 난이도의 기본 채보가 되지 않는다
+        assertEquals("hwa2.bms", ChartFiles.pickDefaultBms(Arrays.asList("easy.bms", "hwa2.bms"), Arrays.asList("EASY.bms")));
+        assertEquals("easy.bms", ChartFiles.pickDefaultBms(Arrays.asList("easy.bms"), Arrays.asList("easy.bms")));
+        assertNull(ChartFiles.pickDefaultBms(Arrays.asList("music.ogg"), null));
+    }
+
+    @Test
+    public void chartFiles_manifestAndChartNames() {
+        assertEquals("Info.txt", ChartFiles.pickManifest(Arrays.asList("a.txt", "Info.txt", "z.txt")));
+        assertEquals("hwa info.txt", ChartFiles.pickManifest(Arrays.asList("readme.txt", "hwa info.txt")));
+        assertNull(ChartFiles.pickManifest(Arrays.asList("a.bms")));
+        List<String> names = Arrays.asList("Easy.bms", "x.bms");
+        assertEquals("Easy.bms", ChartFiles.resolveChartName(" easy.bms ", names));
+        assertEquals("sub/a.bms", ChartFiles.resolveChartName("sub\\a.bms", names));
+        assertNull(ChartFiles.resolveChartName("../a.bms", names));
+        assertNull(ChartFiles.resolveChartName("/sdcard/a.bms", names));
+        assertNull(ChartFiles.resolveChartName("C:/a.bms", names));
+        assertNull(ChartFiles.resolveChartName("a.txt", names));
+        assertNull(ChartFiles.resolveChartName("none.bms", names));
+    }
+
     // ---- SongInfo
 
     @Test
-    public void info_readsKoreanAndEnglishKeys_keepsColonsInTitle() {
-        SongInfo s = new SongInfo();
-        s.applyInfoText("﻿커스텀 곡 제목 = Re:Zero 테마\n커스텀 아티스트: 화평\n");
-        assertEquals("Re:Zero 테마", s.title);
-        assertEquals("화평", s.artist);
-
-        SongInfo e = new SongInfo();
-        e.title = "folder";
-        e.applyInfoText("Title=Hello\r\nartist = World\r\n");
-        assertEquals("Hello", e.title);
-        assertEquals("World", e.artist);
-    }
-
-    @Test
-    public void info_emptyValueKeepsDefault() {
-        SongInfo s = new SongInfo();
-        s.title = "folder";
-        s.applyInfoText("title=\nartist:   \n");
-        assertEquals("folder", s.title);
-        assertEquals("Custom", s.artist);
-    }
-
-    @Test
-    public void countFile_flags() {
-        SongInfo s = new SongInfo();
-        for (String f : new String[]{"map1.bms", "MAP2.BMS", "music.ogg", "cover.PNG", "cover2.jpg", "bga.mp4", "info.txt"}) s.countFile(f);
+    public void songInfo_usesGameRules() {
+        SongInfo s = SongInfo.of("folder", Arrays.asList("map1.bms", "MAP2.BMS", "~map3.bms", "song.mp3", "cover2.jpg", "cover.PNG", "bga.mp4", "info.txt"),
+                "커스텀 곡 제목 = Hello\n난이도1 = 2\n난이도2 = 0\n난이도3 = 9\n난이도2 bms = map2.bms\n난이도3 bms = sub/none.bms\n오토플레이 = 켜기\n", rel -> false);
+        assertEquals("Hello", s.title);
+        assertEquals(SongInfo.DEFAULT_ARTIST, s.artist);
         assertEquals(2, s.bmsCount);
-        assertTrue(s.hasMusic);
-        assertTrue(s.hasVideo);
+        assertEquals("map1.bms", s.defaultBms);
+        assertEquals("MAP2.BMS", s.difficultyCharts[2]);
+        assertNull(s.difficultyCharts[3]);
         assertEquals("cover.PNG", s.cover);
-        assertTrue(s.isValid());
+        assertFalse(s.hasMusic);            // song.mp3는 게임이 고르지 않는다(music.* 또는 .ogg)
+        assertTrue(s.hasVideo);
+        assertTrue(s.visibleInGame());
+        assertEquals(Integer.valueOf(2), s.level(1));
+        assertNull(s.level(2));             // 0 = 그 난이도 없음
+        assertEquals(Integer.valueOf(9), s.level(3));
+        assertEquals(Boolean.TRUE, s.manifest.autoPlay);
+        assertEquals(2, s.warnings.size()); // 난이도3 채보 없음 + 음악 없음
+        assertTrue(s.warnings.get(0).contains("난이도3"));
+    }
+
+    @Test
+    public void songInfo_gameSkipReasons() {
+        SongInfo noInfo = SongInfo.of("a", Arrays.asList("chart.bms", "music.ogg"), null, null);
+        assertTrue(noInfo.isValid());
+        assertFalse(noInfo.visibleInGame());
+        assertTrue(noInfo.gameSkipReason.contains("info"));
+        assertEquals("a", noInfo.title);
+
+        SongInfo noBms = SongInfo.of("b", Arrays.asList("info.txt", "x.ogg", "temp.bms"), "title=B", null);
+        assertTrue(noBms.isValid());
+        assertFalse(noBms.visibleInGame());
+        assertTrue(noBms.gameSkipReason.contains("BMS"));
+        assertEquals("x.ogg", noBms.music);
+
+        SongInfo ok = SongInfo.of("c", Arrays.asList("readme.txt", "1.bms", "music.wav"), "title: C", null);
+        assertTrue(ok.visibleInGame());
+        assertEquals("readme.txt", ok.infoFile);   // info.txt가 없으면 이름순 첫 .txt
+        assertEquals("C", ok.title);
+        assertTrue(ok.warnings.isEmpty());
     }
 
     // ---- SongLibrary
@@ -115,12 +203,17 @@ public class SongsTest {
         song(base, "b-song", "title=Beta", "1.bms");
         song(base, "a-song", "title=alpha", "music.ogg", "cover.jpg");
         song(base, "empty", null, "readme.txt");
+        song(base, "no-info", null, "chart.bms");    // 게임은 건너뛰지만 앱 목록엔 보인다(지울 수 있게)
         song(base, ".dl_partial", null, "1.bms");
         List<SongInfo> list = new SongLibrary(base).scan();
-        assertEquals(2, list.size());
+        assertEquals(3, list.size());
         assertEquals("alpha", list.get(0).title);
         assertEquals("Beta", list.get(1).title);
+        assertEquals("no-info", list.get(2).title);
         assertEquals("cover.jpg", list.get(0).cover);
+        assertFalse(list.get(0).visibleInGame());      // a-song: BMS 없음
+        assertTrue(list.get(1).visibleInGame());
+        assertFalse(list.get(2).visibleInGame());
     }
 
     @Test
