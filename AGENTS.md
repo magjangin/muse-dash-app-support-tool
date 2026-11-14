@@ -15,7 +15,7 @@
   - 공용 경로: `/storage/emulated/0/MuseDash/hwa/`
   - 앱 전용 경로: `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`
 - **XAPK 검색 경로**: `/storage/emulated/0/Download/`, `/storage/emulated/0/MuseDash/`
-- **현재 비서 앱 버전**: v2.3.0 (versionCode 10, 2026-11-14, hwa.moe 탭 검색·태그·정렬·모두 받기·받기 대기열). **GitHub Latest = v2.3.0** (https://github.com/magjangin/muse-dash-app-support-tool/releases/tag/v2.3.0, 태그 `v2.3.0` → 머지 커밋 `fc6010c`, 첨부 `MuseDash_Mod_Assistant-v2.3.0.apk` 62,129 B, SHA-256 `db507736…cb01`, 서명 인증서 `1e08a903…5953`, latest 링크로 다시 받아 해시 일치). 기기에는 v2.3.0 release 빌드(브랜치 빌드, 소스 같음)가 깔려 있다. 이전 GitHub 릴리스 v2.2.0(versionCode 9, 내 곡 탭이 게임과 같은 곡 규칙 사용): 태그 `v2.2.0` → 머지 커밋 `0de7a61`, 첨부 58,301 B, SHA-256 `2367bcc9…af7b`, 서명 인증서 `1e08a903…5953`. v2.1.0(versionCode 8, 토글 2개)은 태그·릴리스 없이 v2.2.0 릴리스 노트에 함께 적었다.
+- **현재 비서 앱 버전**: v2.3.1 (versionCode 11, 2026-11-14, 모두 받기 안내 문구 두 개 수정). 기기에는 v2.3.1 release 빌드(브랜치 빌드)가 깔려 있다. 그 전 릴리스 v2.3.0 (versionCode 10, hwa.moe 탭 검색·태그·정렬·모두 받기·받기 대기열): GitHub (https://github.com/magjangin/muse-dash-app-support-tool/releases/tag/v2.3.0, 태그 `v2.3.0` → 머지 커밋 `fc6010c`, 첨부 `MuseDash_Mod_Assistant-v2.3.0.apk` 62,129 B, SHA-256 `db507736…cb01`, 서명 인증서 `1e08a903…5953`, latest 링크로 다시 받아 해시 일치). 그 전 GitHub 릴리스 v2.2.0(versionCode 9, 내 곡 탭이 게임과 같은 곡 규칙 사용): 태그 `v2.2.0` → 머지 커밋 `0de7a61`, 첨부 58,301 B, SHA-256 `2367bcc9…af7b`, 서명 인증서 `1e08a903…5953`. v2.1.0(versionCode 8, 토글 2개)은 태그·릴리스 없이 v2.2.0 릴리스 노트에 함께 적었다.
 - **게임 버전과 고정 여부**:
   - 기기의 모드 게임 `com.prpr.musedash.mod`: versionName 6.8.0, versionCode 632, targetSdk 36. adb로 사이드로드한 복제 패키지라(`installerPackageName=null`, 마지막 갱신 2026-11-01) 스토어 자동 업데이트를 받지 않는다. 사실상 고정이다.
   - Steam Build ID·DepotDownloader·`.acf` 패치 차단은 안드로이드라 해당 없다. 정품 `com.prpr.musedash`(Play 설치본)는 Play 자동 업데이트를 꺼 둬야 한다. 원본 APK 해시와 OBB 크기는 게임 저장소 AGENTS.md ①에 있다.
@@ -56,7 +56,7 @@
 2. **hwa.moe 온라인 커스텀 곡 다운로더 & 주입기 (Online Store)**:
    - 화평님의 공식 커스텀 앨범 플랫폼 `https://hwa.moe` Supabase REST API 연동.
    - 온라인 앨범 실시간 탐색 (자켓 커버, 곡 제목, 난이도 뱃지, 태그).
-   - 검색·필터(전체/안 받은 곡/받은 곡), 받기 진행 막대(서버가 Content-Length를 안 주면 '받는 중' 애니메이션 — hwa.moe가 그렇다).
+   - 검색·필터(전체/안 받은 곡/받은 곡), 받기 진행 막대(서버가 Content-Length를 안 주면 '받는 중' 애니메이션 — 2026-11-12엔 hwa.moe가 안 줬고, 11-14엔 줘서 %로 나왔다).
    - [⬇ 받기] 원클릭 시 `https://hwa.moe/api/download/<album_id>`에서 ZIP 스트림 다운로드 -> `/storage/emulated/0/MuseDash/hwa/`에 압축 해제. 게임은 다음 시작 때 `SongProvider`로 가져간다 (#10). v1.0.3부터 게임 폴더(`Android/data/.../files/hwa/`)에 직접 쓰는 미러링 코드는 없다 (#8 정정).
    - v2.0.0: `.dl_<폴더>` 임시 폴더에 다 푼 뒤 `renameTo`로 바꾼다. 끊기면 반쪽 곡이 남지 않는다(점 폴더는 앱 목록·`SongProvider` 모두 건너뜀). 같은 폴더가 있으면 지우고 바꾼다. 남은 `.dl_`/`.del_`은 앱 시작 때 `SongLibrary.cleanupLeftovers()`가 지운다.
    - 이미 기기에 있는 곡 자동 감지(폴더 이름 또는 info.txt 제목이 앨범 파일 이름·제목과 같으면) → `[✓ 받음]` + `[삭제]`.
@@ -170,6 +170,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
 ```
 - 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기, v2.3.0부터 hwa.moe 탭 검색·태그·정렬·대기열을 가짜 앨범으로 — 네트워크·실제 받기 없음).
 - 2026-11-12 결과: 단위 34/34, 실기기 7/7. 실기 수동 확인: 설정 탭 연동 표시, hwa.moe 받기(119MB)→내 곡 표시→삭제, 가짜 XAPK(비서 앱 자신의 APK+3MB OBB)로 OBB 배치→시스템 설치기, 앱의 [실행]으로 켠 게임의 `mod.log`에 `assistant-sync songs:5 failed:0`, `config-loaded source:/MuseDash/config.txt`.
+- 2026-11-14 v2.3.0 **모두 받기 실기**: '안 받은 곡' 필터에서 [보이는 9곡 모두 받기] → 2곡씩 받고 나머지는 '대기 중' → 약 250초 만에 9곡 모두 성공(실패 0, `/MuseDash/hwa` 0.9→2.2GB, 14곡 모두 ✓ 받음). 곡당 20~65초. 이때 hwa.moe가 Content-Length를 줘서 진행률이 %로 나왔다(예전엔 안 줬다, 3절). 찾은 문구 버그 2개(받았다 지운 곡까지 '새로 받은'에 셈, 대기 곡까지 '받는 중'에 셈)는 v2.3.1에서 고쳤다(실기기 테스트로 확인. 실기에서 다시 보려면 안 받은 곡이 있어야 하는데, adb로 사용자 곡 폴더를 지우는 것은 권한 판정에서 막혀 하지 않았다). 받은 9곡은 기기에 그대로 두었다(사용자 곡).
 - 2026-11-14 v2.3.0(hwa.moe 검색·받기) 결과: 단위 42/42, lint 통과(경고만, 이전과 같음), 실기기 8/8(`MainActivityDeviceTest.storeSearch_tags_queue` 추가: 가짜 앨범 3개로 따옴표·여러 낱말·초성·파일 이름·태그 검색, 태그 칩, 정렬, 대기열 넣고 빼기). 실기: release 빌드로 `under arrest` 검색 → 1곡, `neon` 검색 → ⬇ 받기 → 받는 중 1곡 → 21초 뒤 ✓ 받음 + '새로 받은 1곡…' 안내·▶ 게임 실행 → 삭제해 기기 곡 5개로 되돌림. 게임은 켜지 않았다(게임에 넘기는 것은 그대로).
 - 2026-11-14 v2.2.0(게임과 같은 곡 규칙) 결과: 단위 42/42(곡 규칙 7개 추가, 옛 `SongInfo` 3개 대체), lint 통과, 실기기 7/7. 3-2절 교차 대조 250줄 차이 0. 실기: 내 곡 탭에서 기기 곡 5개가 레벨(`Lv 5`, summertime `Lv 3 · 5`)·`곡 설정: 고스트 켬 · 권장표 켬`·`🎄 크리스마스`로 표시되고 `You’re Under Arrest`는 `You're Under Arrest`로 보였다. 공용 hwa에 시험 폴더 두 개(info 없음 / 없는 `easy.bms` 지정·음악 없음·모르는 키)를 만들어 '게임에 안 보임'·주황 경고 3줄을 화면으로 확인한 뒤 지웠다. 게임은 이번에 켜지 않았다(앱은 게임에 넘기는 것을 바꾸지 않았다).
 - 2026-11-13 v2.1.0(토글 2개) 결과: 단위 38/38, lint 통과, 실기기 7/7. 실기: 설정 탭에 '스킨 · 이벤트' 카드 표시 → [강제크리스마스] 켬 → 게임 재시작 시 `config-loaded ... forceChristmas:true`, `christmas-ready`, MediaStore 소유자는 계속 게임 → 다시 끔 → 게임을 앞으로 가져오자 `forceChristmas:false`로 다시 읽음. 원래 `config.txt` 끝에 `강제크리스마스=false`·`스파인스킨=true` 두 줄만 붙었다(나머지 바이트 그대로).

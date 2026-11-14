@@ -164,17 +164,21 @@ function setStoreTag(k) {
 function renderBulk(shown) {
   const box = $('storeBulk');
   const todo = shown.filter(([a, song]) => !song && state.downloads[String(a.id)] === undefined).map(([a]) => a);
-  const busy = Object.keys(state.downloads).length;
+  const states = Object.values(state.downloads);
+  const busy = states.length;
+  const queued = states.filter((v) => v === 'queued').length;
+  // 이번에 받은 곡 가운데 아직 기기에 있는 것만 센다(받았다 지운 곡, 같은 곡을 두 번 받은 것은 빼고).
+  const fresh = (state.albums || []).filter((a) => state.storeInstalledNow.has(String(a.id)) && installedSongFor(a)).length;
   const parts = [];
-  if (busy) parts.push(el('span', { text: `받는 중 ${busy}곡` }));
+  if (busy) parts.push(el('span', { text: `받는 중 ${busy - queued}곡` + (queued ? ` · 대기 ${queued}곡` : '') }));
   if (todo.length >= 2) {
     parts.push(el('button', { class: 'btn btn-small btn-primary', text: `⬇ 보이는 ${todo.length}곡 모두 받기`, onclick: () => downloadMany(todo) }));
   }
   if (busy && state.downloadQueue.length) {
     parts.push(el('button', { class: 'btn btn-small btn-ghost', text: '대기 취소', onclick: cancelQueued }));
   }
-  if (state.storeInstalledNow > 0 && !busy) {
-    parts.push(el('span', { text: `새로 받은 ${state.storeInstalledNow}곡은 게임을 완전히 닫고 다시 켜야 들어갑니다.` }),
+  if (fresh > 0 && !busy) {
+    parts.push(el('span', { text: `새로 받은 ${fresh}곡은 게임을 완전히 닫고 다시 켜야 들어갑니다.` }),
       el('button', { class: 'btn btn-small btn-ghost', text: '▶ 게임 실행', onclick: ACTIONS.launchGame }));
   }
   box.hidden = !parts.length;
@@ -305,7 +309,7 @@ window.onSongProgress = (id, pct) => {
 window.onSongInstalled = (id) => {
   delete state.downloads[id];
   delete state.downloadErrors[id];
-  state.storeInstalledNow++;
+  state.storeInstalledNow.add(String(id));
   pumpDownloads();
   refreshSongs();
   renderStore();

@@ -45,7 +45,7 @@ const ACTIONS = {
   requestPermission: () => call('requestStoragePermission'),
   reloadConfig: () => { loadConfig(); toast('설정 파일을 다시 읽었습니다.'); },
   resetConfig,
-  launchGame: () => { state.storeInstalledNow = 0; call('launchGame'); },
+  launchGame: () => { state.storeInstalledNow.clear(); call('launchGame'); },
   resetAllRecords,
   scanPackages,
   modalOk: () => closeModal(true),
