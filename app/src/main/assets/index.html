@@ -64,13 +64,24 @@
     <!-- 탭 2: hwa.moe -->
     <section id="tab-store" class="tab" data-title="hwa.moe">
       <div class="search">
-        <input id="storeSearch" type="search" placeholder="곡 제목·태그 검색" autocomplete="off">
+        <input id="storeSearch" type="search" placeholder="제목·태그 검색 (초성 ㅇㄱㅅㅇ도 됨)" autocomplete="off" enterkeyhint="search">
+        <button id="storeSearchClear" class="search-clear" type="button" aria-label="검색어 지우기" hidden>✕</button>
       </div>
       <div class="filter-row">
         <button class="chip active" data-filter="all">전체</button>
         <button class="chip" data-filter="new">안 받은 곡</button>
         <button class="chip" data-filter="installed">받은 곡</button>
         <span class="spacer"></span>
+        <select id="storeSort" class="sort" aria-label="정렬">
+          <option value="new">최신순</option>
+          <option value="levelAsc">레벨 낮은순</option>
+          <option value="levelDesc">레벨 높은순</option>
+          <option value="name">이름순</option>
+        </select>
+      </div>
+      <div id="storeTags" class="filter-row tag-row"></div>
+      <div class="store-status">
+        <div id="storeBulk" class="bulk" hidden></div>
         <span id="storeCount" class="muted small"></span>
       </div>
       <div id="albumList" class="list"></div>

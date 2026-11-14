@@ -80,7 +80,12 @@ const state = {
   albumsError: null,
   storeFilter: 'all',
   storeQuery: '',
-  downloads: {},   // albumId -> percent (-1 = 크기 모름)
+  storeTag: '',      // 태그(소문자), '' = 전체
+  storeSort: 'new',
+  downloads: {},     // albumId -> percent (-1 = 크기 모름) 또는 'queued'
+  downloadQueue: [], // 아직 시작 안 한 앨범(차례대로)
+  downloadErrors: {}, // albumId -> 마지막 실패 메시지
+  storeInstalledNow: 0, // 이번에 받은 곡 수(게임 다시 켜기 안내용)
   deleting: {},    // folder(lower) -> true
   packages: [],
   pkgStatus: {},   // path -> {msg, pct, busy}

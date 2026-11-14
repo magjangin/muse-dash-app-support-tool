@@ -15,7 +15,7 @@
   - 공용 경로: `/storage/emulated/0/MuseDash/hwa/`
   - 앱 전용 경로: `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`
 - **XAPK 검색 경로**: `/storage/emulated/0/Download/`, `/storage/emulated/0/MuseDash/`
-- **현재 비서 앱 버전**: v2.2.0 (versionCode 9, 2026-11-14, 내 곡 탭이 게임과 같은 곡 규칙 사용). **GitHub Latest = v2.2.0** (https://github.com/magjangin/muse-dash-app-support-tool/releases/tag/v2.2.0, 태그 `v2.2.0` → 머지 커밋 `0de7a61`, 첨부 `MuseDash_Mod_Assistant-v2.2.0.apk` 58,301 B, SHA-256 `2367bcc9…af7b`, 서명 인증서 `1e08a903…5953`, latest 링크로 다시 받아 해시 일치). v2.1.0(versionCode 8, 토글 2개)은 태그·릴리스 없이 v2.2.0 릴리스 노트에 함께 적었다. 기기에는 v2.2.0 release 빌드(브랜치 빌드, 소스 같음)가 깔려 있다.
+- **현재 비서 앱 버전**: v2.3.0 (versionCode 10, 2026-11-14, hwa.moe 탭 검색·태그·정렬·모두 받기·받기 대기열). 기기에는 v2.3.0 release 빌드(브랜치 빌드, 소스 같음)가 깔려 있다. 이전 GitHub 릴리스 v2.2.0(versionCode 9, 내 곡 탭이 게임과 같은 곡 규칙 사용): 태그 `v2.2.0` → 머지 커밋 `0de7a61`, 첨부 58,301 B, SHA-256 `2367bcc9…af7b`, 서명 인증서 `1e08a903…5953`. v2.1.0(versionCode 8, 토글 2개)은 태그·릴리스 없이 v2.2.0 릴리스 노트에 함께 적었다.
 - **게임 버전과 고정 여부**:
   - 기기의 모드 게임 `com.prpr.musedash.mod`: versionName 6.8.0, versionCode 632, targetSdk 36. adb로 사이드로드한 복제 패키지라(`installerPackageName=null`, 마지막 갱신 2026-11-01) 스토어 자동 업데이트를 받지 않는다. 사실상 고정이다.
   - Steam Build ID·DepotDownloader·`.acf` 패치 차단은 안드로이드라 해당 없다. 정품 `com.prpr.musedash`(Play 설치본)는 Play 자동 업데이트를 꺼 둬야 한다. 원본 APK 해시와 OBB 크기는 게임 저장소 AGENTS.md ①에 있다.
@@ -60,6 +60,10 @@
    - [⬇ 받기] 원클릭 시 `https://hwa.moe/api/download/<album_id>`에서 ZIP 스트림 다운로드 -> `/storage/emulated/0/MuseDash/hwa/`에 압축 해제. 게임은 다음 시작 때 `SongProvider`로 가져간다 (#10). v1.0.3부터 게임 폴더(`Android/data/.../files/hwa/`)에 직접 쓰는 미러링 코드는 없다 (#8 정정).
    - v2.0.0: `.dl_<폴더>` 임시 폴더에 다 푼 뒤 `renameTo`로 바꾼다. 끊기면 반쪽 곡이 남지 않는다(점 폴더는 앱 목록·`SongProvider` 모두 건너뜀). 같은 폴더가 있으면 지우고 바꾼다. 남은 `.dl_`/`.del_`은 앱 시작 때 `SongLibrary.cleanupLeftovers()`가 지운다.
    - 이미 기기에 있는 곡 자동 감지(폴더 이름 또는 info.txt 제목이 앨범 파일 이름·제목과 같으면) → `[✓ 받음]` + `[삭제]`.
+   - **v2.3.0 검색·받기 (전부 `assets/js/store.js`, 네이티브는 그대로)**:
+     - 서버 데이터(2026-11-14, 14곡): 제목이 `뮤즈대시 커스텀 N레벨 <곡>` 꼴이고 머리말 레벨이 실제 `difficulty`와 다른 곡이 있다(`5레벨 You’re Under Arrest` = 7). 그래서 `albumName()`이 머리말을 떼고 레벨은 `difficulty_easy/hard/master/hidden`(없으면 `difficulty`) 배지로만 보인다. `artist`는 모두 null이라 검색 대상에서 뺐다. `platforms`(`['pc']`만인 곡이 많음)는 기기에서 그 곡들이 잘 돌아서 무시한다.
+     - `albumMatches()`: 제목·폴더(download_filename)·description·태그를 `searchKey()`(NFC, 소문자, 공백·따옴표·기호 제거)로 비교. 낱말은 AND. 자음만으로 된 낱말은 `choseong()`로 비교. **NFKC를 쓰면 안 된다**: 호환 자모 `ㄱ`(U+3131)이 첫가끝 자모(U+1100)로 바뀌어 초성 검색이 깨진다.
+     - 받기 대기열: `state.downloads[id]`가 `'queued'` 또는 진행률. `pumpDownloads()`가 동시에 `MAX_PARALLEL_DOWNLOADS`(2)개까지만 `downloadSong`을 부른다. 브리지 쪽 `background`는 `newCachedThreadPool`이라 JS가 막지 않으면 전부 동시에 받는다. 받는 중인 곡을 멈추는 기능은 없다(브리지에 취소가 없음).
 3. **커스텀 곡 & 런처 (Custom Songs & Launcher)**:
    - 기기 내 등록된 커스텀 곡 목록 실시간 파싱 및 세부 메타데이터(BMS, BGM, 자켓) 표시.
    - **v2.2.0: 게임과 같은 곡 규칙** (3-2절). 제목(`커스텀 곡 제목` → `곡 이름` → 폴더), 아티스트, 음악·자켓·영상 고르기, 임시본 뺀 BMS 수, 레벨, 난이도별 채보, 크리스마스 배경, info.txt 곡별 설정을 게임 코드 그대로 계산한다. 게임이 건너뛸 곡(info `.txt`·정식 `.bms` 없음)은 `gameSkip` → 빨간 '게임에 안 보임', 그 밖의 문제(난이도별 채보 못 찾음·음악 없음·모르는 info 키)는 `warnings` → 주황 글씨. 건너뛸 곡도 목록에는 둔다(지울 수 있게, `isValid()`는 예전처럼 BMS나 음악이 하나라도 있으면). 사용자용 설명은 `docs/SONG_FOLDER.md`.
@@ -164,8 +168,9 @@ nox_adb -s R3CR10T2JFA shell monkey -p com.hwa.musedash.assistant -c android.int
 # 6. (기기당 1회) 공용 config.txt 소유자를 게임으로 지정 — 이게 없으면 게임이 설정 토글을 못 읽음 (Dead End #9)
 nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file --bind owner_package_name:s:com.prpr.musedash.mod --where \"_data='/storage/emulated/0/MuseDash/config.txt'\""
 ```
-- 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기).
+- 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기, v2.3.0부터 hwa.moe 탭 검색·태그·정렬·대기열을 가짜 앨범으로 — 네트워크·실제 받기 없음).
 - 2026-11-12 결과: 단위 34/34, 실기기 7/7. 실기 수동 확인: 설정 탭 연동 표시, hwa.moe 받기(119MB)→내 곡 표시→삭제, 가짜 XAPK(비서 앱 자신의 APK+3MB OBB)로 OBB 배치→시스템 설치기, 앱의 [실행]으로 켠 게임의 `mod.log`에 `assistant-sync songs:5 failed:0`, `config-loaded source:/MuseDash/config.txt`.
+- 2026-11-14 v2.3.0(hwa.moe 검색·받기) 결과: 단위 42/42, lint 통과(경고만, 이전과 같음), 실기기 8/8(`MainActivityDeviceTest.storeSearch_tags_queue` 추가: 가짜 앨범 3개로 따옴표·여러 낱말·초성·파일 이름·태그 검색, 태그 칩, 정렬, 대기열 넣고 빼기). 실기: release 빌드로 `under arrest` 검색 → 1곡, `neon` 검색 → ⬇ 받기 → 받는 중 1곡 → 21초 뒤 ✓ 받음 + '새로 받은 1곡…' 안내·▶ 게임 실행 → 삭제해 기기 곡 5개로 되돌림. 게임은 켜지 않았다(게임에 넘기는 것은 그대로).
 - 2026-11-14 v2.2.0(게임과 같은 곡 규칙) 결과: 단위 42/42(곡 규칙 7개 추가, 옛 `SongInfo` 3개 대체), lint 통과, 실기기 7/7. 3-2절 교차 대조 250줄 차이 0. 실기: 내 곡 탭에서 기기 곡 5개가 레벨(`Lv 5`, summertime `Lv 3 · 5`)·`곡 설정: 고스트 켬 · 권장표 켬`·`🎄 크리스마스`로 표시되고 `You’re Under Arrest`는 `You're Under Arrest`로 보였다. 공용 hwa에 시험 폴더 두 개(info 없음 / 없는 `easy.bms` 지정·음악 없음·모르는 키)를 만들어 '게임에 안 보임'·주황 경고 3줄을 화면으로 확인한 뒤 지웠다. 게임은 이번에 켜지 않았다(앱은 게임에 넘기는 것을 바꾸지 않았다).
 - 2026-11-13 v2.1.0(토글 2개) 결과: 단위 38/38, lint 통과, 실기기 7/7. 실기: 설정 탭에 '스킨 · 이벤트' 카드 표시 → [강제크리스마스] 켬 → 게임 재시작 시 `config-loaded ... forceChristmas:true`, `christmas-ready`, MediaStore 소유자는 계속 게임 → 다시 끔 → 게임을 앞으로 가져오자 `forceChristmas:false`로 다시 읽음. 원래 `config.txt` 끝에 `강제크리스마스=false`·`스파인스킨=true` 두 줄만 붙었다(나머지 바이트 그대로).
 - 2026-11-13 v2.0.1(코드 분할만) 결과: 단위 34/34, lint 통과, 실기기 7/7. 브랜치 빌드(50,805바이트)를 실기에 깔아 실행했고 WebView 콘솔 오류가 없었다. 릴리스 첨부 파일은 머지 뒤 main에서 다시 빌드한 것이다(50,865바이트, 소스는 같고 바이트만 다름).
@@ -283,5 +288,6 @@ Remove-Item MuseDash_Mod_Assistant-vX.Y.Z.apk  # *.apk는 .gitignore에 있지�
    - JS와 Java의 공백 정의가 다르다. JS `trim()`·`\s`는 NBSP(U+00A0)·BOM(U+FEFF)·유니코드 공백까지 지우지만 Java `trim()`·`Character.isWhitespace`는 못 지운다 → `HwaManifest.jsTrim`/`isJsSpace`로 맞췄다. 줄 구분자도 JS `search(/[:=：]/)`처럼 "처음 나오는 것"이어야 한다(`=` 먼저 찾고 없으면 `:`가 아니다).
    - 게임은 파일 이름을 `toLowerCase().localeCompare()`로 정렬한다. Java `compareTo`(코드포인트)와는 `_`·`-` 같은 기호가 섞일 때 순서가 다르다 → `Collator.getInstance(Locale.ROOT)`. info 파일·기본 채보가 '이름순 첫 번째'로 정해지는 경우에만 영향이 있다.
    - JS `parseFloat`는 `0.12s`를 0.12로 읽는다. Java `Double.parseDouble`은 예외 → 앞쪽 숫자만 정규식으로 잘라 읽는다.
+   - (v2.3.0) Git Bash에서 `nox_adb push 파일 /data/local/tmp/t.apk`를 하면 MSYS가 `/data/...`를 `C:/Program Files/Git/data/...`로 바꿔 push·install이 둘 다 실패한다. 기기 명령은 PowerShell로 돌리거나 `MSYS_NO_PATHCONV=1`을 붙인다. PowerShell에서 `exec-out screencap -p > 파일`은 바이너리가 깨지므로 `shell screencap -p /data/local/tmp/s.png` 뒤 `pull`.
    - Git Bash heredoc 안의 Python 문자열로 Java 소스를 고치다가 `"\n"` 문자열이 실제 줄바꿈으로 들어가 컴파일이 87줄 깨졌다. 다른 heredoc은 `'`가 섞여 bash가 `unexpected EOF`로 거부했다. 여러 줄 편집은 Edit 도구나, Write로 만든 스크립트 파일(`python -I 파일`)로 한다.
    - 기기 화면 캡처가 보라색 그라데이션만 나오면 화면 보호기(`com.android.dreams.basic`, `mWakefulness=Dreaming`)다. `input keyevent KEYCODE_WAKEUP` 뒤 `am start -n com.hwa.musedash.assistant/.MainActivity`로 앞에 띄운다(`monkey`만으로는 안 올라옴).
