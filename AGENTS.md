@@ -15,7 +15,7 @@
   - 공용 경로: `/storage/emulated/0/MuseDash/hwa/`
   - 앱 전용 경로: `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/hwa/`
 - **XAPK 검색 경로**: `/storage/emulated/0/Download/`, `/storage/emulated/0/MuseDash/`
-- **현재 비서 앱 버전**: v2.1.0 (versionCode 8, 2026-11-13, 설정 토글 2개 추가). main에 머지했지만 **태그·GitHub 릴리스는 아직 없다**(GitHub Latest는 v2.0.1). 기기에는 v2.1.0 release 빌드가 깔려 있다.
+- **현재 비서 앱 버전**: v2.2.0 (versionCode 9, 2026-11-14, 내 곡 탭이 게임과 같은 곡 규칙 사용). v2.1.0(versionCode 8, 토글 2개)과 함께 main에 머지했지만 **태그·GitHub 릴리스는 아직 없다**(GitHub Latest는 v2.0.1). 기기에는 v2.2.0 release 빌드가 깔려 있다.
 - **게임 버전과 고정 여부**:
   - 기기의 모드 게임 `com.prpr.musedash.mod`: versionName 6.8.0, versionCode 632, targetSdk 36. adb로 사이드로드한 복제 패키지라(`installerPackageName=null`, 마지막 갱신 2026-11-01) 스토어 자동 업데이트를 받지 않는다. 사실상 고정이다.
   - Steam Build ID·DepotDownloader·`.acf` 패치 차단은 안드로이드라 해당 없다. 정품 `com.prpr.musedash`(Play 설치본)는 Play 자동 업데이트를 꺼 둬야 한다. 원본 APK 해시와 OBB 크기는 게임 저장소 AGENTS.md ①에 있다.
@@ -33,10 +33,11 @@
 - **UI는 WebView 유지** (사용자 결정: Compose 재작성 대신 구조 정리). `assets/index.html`(뼈대) + `app.css` + `js/*.js`(v2.0.1에서 `app.js`를 나눔: `core`(브리지 호출·`el()`·확인 창·`state`) → `config` → `songs` → `store` → `xapk` → `main`(탭·이벤트·시작) 순서로 읽는 일반 `<script>`). ES 모듈은 `file:///android_asset`에서 CORS로 막힐 수 있어 쓰지 않고, 최상위 `const`/`function`을 전역으로 공유한다. 실기기 테스트가 전역 `confirmBox`를 부르므로 이름을 바꾸면 테스트도 고친다. 서버·파일에서 온 문자열은 `el()` 헬퍼로 `textContent`에만 넣는다 — v1.0.x는 hwa.moe 제목·태그를 `innerHTML`로 넣어, 서버 데이터가 파일 삭제·설치까지 하는 브리지를 부를 수 있었다.
 - **네이티브는 기능별 클래스, `AndroidBridge`는 얇은 JS 창구**: 스레드 분리와 결과 전달만 한다. JSON 모양은 `BridgeJson`, 앱·게임 버전과 저장소 권한은 `AppStatus`(v2.0.1). 결과는 `MainActivity.callJs(fn, args...)`가 `JSONObject.quote`로 인코딩해 `window.on*`를 부른다.
   - `config/ModConfig`(config.txt 규칙, 순수 Java) · `config/ConfigRepository`(파일·MediaStore 소유자)
-  - `songs/SongLibrary`(목록·삭제·자켓) · `songs/SongDownloader`(hwa.moe ZIP) · `songs/SafePaths`(폴더 이름·zip slip)
+  - `songs/SongLibrary`(목록·삭제·자켓) · `songs/SongInfo`(곡 하나, `of()`가 파일 이름·info 내용으로 채움) · `songs/SongDownloader`(hwa.moe ZIP) · `songs/SafePaths`(폴더 이름·zip slip)
+  - `songs/HwaManifest`·`songs/ChartFiles`·`songs/TextNormalizer`(v2.2.0, 순수): 게임 mod.js 곡 규칙의 Java 사본. 3-2절.
   - `xapk/XapkRules`(순수) · `xapk/PackageInstaller` · `records/RecordResetQueue`
   - 순수 Java로 뺀 규칙은 JVM 단위 테스트(`app/src/test`)로, 기기 의존 동작은 실기기 테스트(`app/src/androidTest`)로 검증한다.
-- **앱 본체는 외부 라이브러리 0개** (androidx 없음 → release APK 약 50KB). AGP 9의 내장 Kotlin이 kotlin-stdlib(약 2MB)를 넣어서 `gradle.properties`에 `android.builtInKotlin=false`를 둔다. FileProvider도 androidx 대신 `GenericFileProvider`(캐시·공용 저장소 아래 파일만 엶).
+- **앱 본체는 외부 라이브러리 0개** (androidx 없음 → release APK 약 58KB, v2.2.0). AGP 9의 내장 Kotlin이 kotlin-stdlib(약 2MB)를 넣어서 `gradle.properties`에 `android.builtInKotlin=false`를 둔다. FileProvider도 androidx 대신 `GenericFileProvider`(캐시·공용 저장소 아래 파일만 엶).
 - **서명 키 고정**: `signing/uber-debug.keystore` = v1.0.x를 서명한 uber-apk-signer 내장 공개 debug 키(alias `androiddebugkey`, 암호 `android`, SHA-256 `1e08a903…5953`). debug·release 모두 이 키. 바꾸면 기존 사용자가 앱을 지워야 해서 설정 예약·권한이 날아간다.
 - **targetSdk 34 유지**: 35+는 edge-to-edge 강제 등 동작이 바뀌고, 사이드로드 전용이라 올릴 이득이 없다.
 - **`QUERY_ALL_PACKAGES` 제거** → `<queries>`에 게임 패키지와 `INSTALL_PACKAGE` 인텐트만. 게임 설치 확인·실행·`grantUriPermission`, 시스템 설치기 찾기(#13) 모두 실기로 확인.
@@ -61,6 +62,8 @@
    - 이미 기기에 있는 곡 자동 감지(폴더 이름 또는 info.txt 제목이 앨범 파일 이름·제목과 같으면) → `[✓ 받음]` + `[삭제]`.
 3. **커스텀 곡 & 런처 (Custom Songs & Launcher)**:
    - 기기 내 등록된 커스텀 곡 목록 실시간 파싱 및 세부 메타데이터(BMS, BGM, 자켓) 표시.
+   - **v2.2.0: 게임과 같은 곡 규칙** (3-2절). 제목(`커스텀 곡 제목` → `곡 이름` → 폴더), 아티스트, 음악·자켓·영상 고르기, 임시본 뺀 BMS 수, 레벨, 난이도별 채보, 크리스마스 배경, info.txt 곡별 설정을 게임 코드 그대로 계산한다. 게임이 건너뛸 곡(info `.txt`·정식 `.bms` 없음)은 `gameSkip` → 빨간 '게임에 안 보임', 그 밖의 문제(난이도별 채보 못 찾음·음악 없음·모르는 info 키)는 `warnings` → 주황 글씨. 건너뛸 곡도 목록에는 둔다(지울 수 있게, `isValid()`는 예전처럼 BMS나 음악이 하나라도 있으면). 사용자용 설명은 `docs/SONG_FOLDER.md`.
+   - 앱 표시용 아티스트 기본값은 `Custom`(게임은 `화영왕 N`). 하위 경로 난이도별 채보(`sub/a.bms`)는 게임은 존재 확인 없이 받고 나중에 읽다 실패하면 기본 채보로 대신하므로, 앱은 실제 파일이 없을 때 경고를 띄운다. 이 두 가지만 게임과 일부러 다르다.
    - **커스텀 로컬 기록 초기화 (전체 / 곡별)**:
      - **`[ 🔄 전체 기록 초기화 ]`**: 모든 커스텀 곡의 로컬 플레이 기록(점수, 정확도, 풀콤보 등) 일괄 리셋 예약.
      - 각 곡별 **`[ 🔄 기록 리셋 ]`**: 특정 곡의 모든 난이도 기록 리셋 예약.
@@ -85,6 +88,7 @@
   - Gadget은 script 모드로 `/storage/emulated/0/Android/data/com.prpr.musedash.mod/files/mod.js`를 실행한다(`on_change: reload`).
   - mod.js 빌드: 게임 저장소 `tools/frida/mod`에서 `npm run build` → `build/clone/mod.js` → `nox_adb push build/clone/mod.js /sdcard/Android/data/com.prpr.musedash.mod/files/mod.js`.
   - 이 경로가 PC 모드의 `Mods/`에 해당하는 배포 위치다. 기기에는 개인 전체판만 올린다(Dead End #10의 사고 기록).
+  - 공개본(`muse-dash-phone/mod`)으로 옮길 때는 2026-11-13부터 게임 저장소의 `python -I tools/sync_public.py`를 쓴다(`preserve/`와 `// @private` 줄을 빼고 해금 문자열이 들어가면 실패). 자세한 건 게임 저장소 AGENTS.md.
 - **config.txt**: mod.js `src/config.ts`가 공용 `/MuseDash/config.txt`를 1초마다 읽는다. 못 읽으면 `files/save custom key/config.txt`로 폴백한다. 키는 `ModConfig`가 정의한다. 소유자 문제는 Dead End #9.
 - **SongProvider** (`content://com.hwa.musedash.assistant.songs`, `exported=false`, `grantToGame()`이 prefix 읽기 권한을 준다):
   | URI | 반환 | 쓰는 곳 |
@@ -94,6 +98,7 @@
   | `/record_resets` | 커서 `(target)`, `ALL` 또는 곡 폴더 이름 | 같은 곳, `files/record/`의 `.json`·`.bak`·`.tmp` 삭제 |
   | `/record_resets_ack` | 커서 `(status)`, 예약 목록 비우기 | 삭제 뒤 |
   - 권한은 `MainActivity.onCreate`·`onResume`·`launchGame`·기록 초기화 예약 때 준다. 게임을 강제 종료하거나 재부팅하면 권한이 사라진다.
+  - 게임이 provider를 부르는 시점: 2026-11-09(게임 커밋 `9e7b7e1`)부터 `index.ts`가 **콜드 스타트 때 Unity가 뜨기 전(onCreate 안)** `restoreCache` 다음에 `pullFromAssistant(HWA_DIR)`를 부른다. `loadLibrary()` 안에서는 더 부르지 않으므로 mod.js 핫리로드(`on_change: reload`)로는 곡·기록 초기화가 반영되지 않는다. 시작 로그는 `assistant-sync-start` → `assistant-sync`(또는 `-skip`), 기록 초기화는 `record-resets-completed`.
 - **화면(JS) ↔ 네이티브** (`window.AndroidBridge`, 모든 메서드는 `@JavascriptInterface`, JavaBridge 스레드에서 불린다):
   - 바로 JSON 문자열을 돌려주는 메서드: `getAppState`, `getConfig`, `setConfigOption(id, bool)`, `resetConfig`, `listSongs`, `getPendingRecordResets`, `scanPackages`. 모양은 `BridgeJson`이 정한다.
   - 오래 걸리는 일은 `void`로 돌아오고, 결과는 `MainActivity.callJs`가 `window.on*`로 알린다:
@@ -102,6 +107,32 @@
     - 설치 `installPackage(path)` → `onPackageStatus(path, message, percent)`, 끝나면 `onPackageDone(path, ok)`.
   - 그 밖의 `void` 메서드: `requestStoragePermission`, `resetAllRecords`, `resetSongRecord(folder)`, `cancelRecordResets`, `launchGame`, `openUrl(https만)`, `showToast`.
   - 네이티브가 부르는 것: `onAppResume()`, `onBackPressed()`. `onBackPressed()`가 `true`를 돌려주면 네이티브는 뒤로 가기를 하지 않는다.
+  - `listSongs` 항목(v2.2.0): `{folder, title, artist, bmsCount, hasMusic, hasVideo, hasCover, pendingReset, levels[5](레벨 또는 null), difficultyCharts(찾은 난이도별 채보 수), christmas, overrides{autoPlay, blockFever, cinema, showGhostNotes, fixDt 중 info에 값이 있는 것}, gameSkip(문자열 또는 null), warnings[]}`. 화면(`songs.js`)은 그리기만 하고 판단은 네이티브가 한다.
+
+---
+
+## 3-2. 게임 소스와 짝을 이루는 코드 (게임 쪽이 바뀌면 같이 고칠 것)
+비서 앱 일부는 게임 mod.js 소스(`H:\source\repos\com.prpr.musedash_v6.8.0-unity-android\tools\frida\mod\src`)를 Java로 옮긴 사본이다. 게임 저장소에는 이 규칙들의 테스트가 없으므로 앱의 JVM 테스트와 아래 대조가 사실상 유일한 검증이다.
+
+| 게임 파일 | 앱 파일 | 무엇 |
+|---|---|---|
+| `config.ts` (`currentConfig`, `reloadConfig`의 키·별칭, `DEFAULT_CONFIG_TEXT`) | `config/ModConfig.java` (`OPTIONS`, `parseBool`, `defaultText`) · `assets/js/config.js` (`OPTIONS` 설명) · 실기기 테스트 토글 수 | 설정 키·별칭·기본값·주석 |
+| `hwa/manifest.ts` (`parseManifest`, `normalizeKey`, 키 확인 순서) | `songs/HwaManifest.java` | info.txt 읽기 |
+| `hwa/chartFiles.ts` (`isTempFile`, `pickDefaultBms`, `resolveChartName`) | `songs/ChartFiles.java` | 채보 고르기 |
+| `hwa/library.ts` (`pickManifest`, music/cover/video 정규식, 건너뛰기 조건) | `songs/ChartFiles.java` 상수 · `songs/SongInfo.of()` | 파일 고르기, '게임에 안 보임' |
+| `hwa/text.ts` (`normalizeEnglishContractions`) | `songs/TextNormalizer.java` | 제목 축약형 |
+| `autoplay.ts`·`fever.ts`(전역 또는 곡), `customChart.ts` 시네마(전역 그리고 곡), `ghost.ts`(곡 우선), `christmas.ts`(커스텀은 곡 값만) | `assets/js/songs.js` 주석 · `ModConfig.defaultText` 주석 · `docs/SONG_FOLDER.md` 4절 | 곡별 설정 우선순위 설명 |
+| `hwa/assistant.ts` (`AUTHORITY`, `/list`·`/file`·`/record_resets`·`/record_resets_ack`, `.from_assistant`) | `SongProvider.java` · `records/RecordResetQueue.java` | 3-1절 provider 규약 |
+
+- 확인 방법: `git -C <게임 저장소> log --oneline <마지막 대조 커밋>..HEAD -- tools/frida/mod/src/config.ts tools/frida/mod/src/hwa/` 로 바뀐 게 있는지 본다. **마지막 대조: 게임 `0f4bfb2`(2026-11-14)**. 이때 `config.ts`·`hwa/`의 마지막 변경은 `257f834`(크리스마스·스킨)였고 앱은 v2.1.0에서 이미 맞췄다. 11-13 리팩토링(`b988f81`)은 `spineSkin.ts`→`spine/`, `customTag.ts`→`tag/`, `customAudio.ts`→`audio/`, `battle.ts`→`battle/`, `preserve*.ts`→`preserve/`로 나눈 것뿐이라 앱 규약에 영향이 없다.
+- **교차 대조 도구** (`H:\Android\_xcheck\`, 저장소 밖, 2026-11-14 만듦): 같은 입력을 게임 TS 원본과 앱 Java로 돌려 결과를 줄 단위로 비교한다.
+  1. 기기 곡 덤프: `nox_adb shell 'cd /sdcard/MuseDash/hwa && for d in *; do echo "##DIR $d"; ls -1p "$d" | while read f; do echo "##F $f"; done; for t in "$d"/*.txt; do [ -f "$t" ] && echo "##TXT ${t#*/}" && base64 -w0 "$t" && echo; done; done' > raw.txt`
+  2. `python -I make_corpus.py raw.txt corpus.json` (기기 곡 + 경계 사례 5개) → `python -I to_lines.py corpus.json corpus.lines`
+  3. TS: 게임 `hwa/manifest.ts`·`chartFiles.ts`·`text.ts`를 `ts/`에 복사하면서 `from "./x.js"`를 `"./x.ts"`로 바꾸고 `node ts/run.ts corpus.json > ts.txt` (Node 24의 타입 제거 실행, 빌드 도구 불필요). `run.ts`의 `pickManifest`·`pickFile`은 `library.ts`에서 복사한 것이라 그쪽이 바뀌면 같이 고친다.
+  4. Java: `javac -encoding UTF-8 -cp <app\build\intermediates\javac\debug\compileDebugJavaWithJavac\classes> -d out XCheck.java` → `java -cp "out;<classes>" XCheck corpus.lines > java.txt`
+  5. 두 파일을 줄 단위로 비교. 2026-11-14: 곡 10개 × 25항목 = 250줄, 차이 0.
+
+---
 
 ---
 
@@ -109,7 +140,7 @@
 ```powershell
 # 1. 빌드 + 단위 테스트 + lint (JAVA_HOME = JDK 17+)
 .\gradlew.bat testDebugUnitTest lintDebug assembleRelease
-# 산출물: app\build\outputs\apk\release\app-release.apk (약 50KB)
+# 산출물: app\build\outputs\apk\release\app-release.apk (약 58KB)
 
 # 2. 실기기 계측 테스트 — connectedAndroidTest는 쓰지 않는다 (아래 Dead End #15)
 .\gradlew.bat assembleDebug assembleDebugAndroidTest
@@ -135,6 +166,7 @@ nox_adb -s R3CR10T2JFA shell "content update --uri content://media/external/file
 ```
 - 실기기 테스트 내용: `SongProviderDeviceTest`(list/file/record_resets 규약, `..` 탈출·쓰기 거부, 공용 hwa에 `__assistant_device_test__` 폴더만 만들고 지움, 예약 목록은 백업 후 복원), `ConfigDeviceTest`(실제 config.txt 토글 저장 뒤 MediaStore 소유자 유지 확인, 원래 바이트로 덮어써 복원), `MainActivityDeviceTest`(WebView·브리지·탭·확인 창·뒤로 가기).
 - 2026-11-12 결과: 단위 34/34, 실기기 7/7. 실기 수동 확인: 설정 탭 연동 표시, hwa.moe 받기(119MB)→내 곡 표시→삭제, 가짜 XAPK(비서 앱 자신의 APK+3MB OBB)로 OBB 배치→시스템 설치기, 앱의 [실행]으로 켠 게임의 `mod.log`에 `assistant-sync songs:5 failed:0`, `config-loaded source:/MuseDash/config.txt`.
+- 2026-11-14 v2.2.0(게임과 같은 곡 규칙) 결과: 단위 42/42(곡 규칙 7개 추가, 옛 `SongInfo` 3개 대체), lint 통과, 실기기 7/7. 3-2절 교차 대조 250줄 차이 0. 실기: 내 곡 탭에서 기기 곡 5개가 레벨(`Lv 5`, summertime `Lv 3 · 5`)·`곡 설정: 고스트 켬 · 권장표 켬`·`🎄 크리스마스`로 표시되고 `You’re Under Arrest`는 `You're Under Arrest`로 보였다. 공용 hwa에 시험 폴더 두 개(info 없음 / 없는 `easy.bms` 지정·음악 없음·모르는 키)를 만들어 '게임에 안 보임'·주황 경고 3줄을 화면으로 확인한 뒤 지웠다. 게임은 이번에 켜지 않았다(앱은 게임에 넘기는 것을 바꾸지 않았다).
 - 2026-11-13 v2.1.0(토글 2개) 결과: 단위 38/38, lint 통과, 실기기 7/7. 실기: 설정 탭에 '스킨 · 이벤트' 카드 표시 → [강제크리스마스] 켬 → 게임 재시작 시 `config-loaded ... forceChristmas:true`, `christmas-ready`, MediaStore 소유자는 계속 게임 → 다시 끔 → 게임을 앞으로 가져오자 `forceChristmas:false`로 다시 읽음. 원래 `config.txt` 끝에 `강제크리스마스=false`·`스파인스킨=true` 두 줄만 붙었다(나머지 바이트 그대로).
 - 2026-11-13 v2.0.1(코드 분할만) 결과: 단위 34/34, lint 통과, 실기기 7/7. 브랜치 빌드(50,805바이트)를 실기에 깔아 실행했고 WebView 콘솔 오류가 없었다. 릴리스 첨부 파일은 머지 뒤 main에서 다시 빌드한 것이다(50,865바이트, 소스는 같고 바이트만 다름).
 - PC에 Nox가 떠 있으면 `nox_adb`(서버 v36)가 계속 adb 서버를 재시작하므로, 플랫폼툴 `adb`(v41) 대신 반드시 `C:\Program Files (x86)\Nox\bin\nox_adb.exe`를 쓴다 (버전 충돌로 `device not found` 발생).
@@ -208,7 +240,7 @@ Remove-Item MuseDash_Mod_Assistant-vX.Y.Z.apk  # *.apk는 .gitignore에 있지�
    - 해결 (두 저장소에 걸친 변경):
      - 비서 앱 `SongProvider` (`content://com.hwa.musedash.assistant.songs`): `/list`는 `/MuseDash/hwa` 아래 파일의 (path, size, mtime), `/file/<경로>`는 읽기 전용 파일. `exported=false` + `grantUriPermissions=true`로 두고, `SongProvider.grantToGame()`이 게임에 prefix URI 읽기 권한을 준다.
      - 권한을 주는 시점: `MainActivity.onCreate`, `onResume`, `launchGame`. **게임을 `am force-stop` 하거나 재부팅하면 URI 권한이 사라진다** (실측: 강제 종료 뒤 재실행 시 `Permission Denial ... not exported`). 그래서 비서 앱이 앞에 올 때마다 다시 준다. URI 권한이 패키지 가시성도 함께 열어 줘서, 게임(targetSdk 36)의 매니페스트에 `<queries>`가 없어도 provider를 찾는다.
-     - 게임 쪽: `src/hwa/assistant.ts`의 `pullFromAssistant()`를 `loadLibrary()` 맨 앞에서 호출. 같은 코드가 두 곳에 있다: 개인 전체판 `H:/source/repos/com.prpr.musedash_v6.8.0-unity-android/tools/frida/mod` (기기용, `npm run build` → `build/clone/mod.js`)와 공개본 `muse-dash-phone/mod` (릴리스용, 보존 모드 3개 없음). `frida-java-bridge`로 provider를 읽어, 크기가 다른 파일만 `files/hwa`로 복사한다. 가져온 곡 폴더에는 `.from_assistant` 마커를 남긴다. 목록에서 사라진 곡은 마커가 있는 폴더만 지우고, adb로 넣은 곡은 건드리지 않는다. provider를 못 읽으면 아무것도 지우지 않고 기존 곡으로 진행한다.
+     - 게임 쪽: `src/hwa/assistant.ts`의 `pullFromAssistant()`를 `loadLibrary()` 맨 앞에서 호출. (**2026-11-09 정정**: 게임 로딩 멈춤 대응으로 `index.ts`가 콜드 스타트 때 Unity 전에 부르도록 옮겼다. 3-1절.) 같은 코드가 두 곳에 있다: 개인 전체판 `H:/source/repos/com.prpr.musedash_v6.8.0-unity-android/tools/frida/mod` (기기용, `npm run build` → `build/clone/mod.js`)와 공개본 `muse-dash-phone/mod` (릴리스용, 보존 모드 3개 없음). `frida-java-bridge`로 provider를 읽어, 크기가 다른 파일만 `files/hwa`로 복사한다. 가져온 곡 폴더에는 `.from_assistant` 마커를 남긴다. 목록에서 사라진 곡은 마커가 있는 폴더만 지우고, adb로 넣은 곡은 건드리지 않는다. provider를 못 읽으면 아무것도 지우지 않고 기존 곡으로 진행한다.
      - 곡은 게임 **시작 시에만** 가져온다. 게임이 켜져 있으면 완전히 껐다 켜야 반영된다.
    - 검증 로그 (`mod.log`): `{"t":"assistant-sync","songs":4,"files":2507,"copied":633,"failed":0,"removed":0}` → `hwa-library count:4` (`매칭앱 프린세스`가 `files/hwa`에서 로드됨). 더미 폴더를 추가하자 `copied:1`, 지우자 `removed:1`을 확인했다.
    - **아이콘은 건드리지 않는다 (사용자 지시)**: `hwa_tag_icon.png`와 앱 런처 아이콘, 그리고 아이콘 관련 코드(`syncSongsToGameDataDir`의 아이콘 복사 부분 포함)는 수정·이동·덮어쓰기하지 않는다. 문서에도 아이콘을 복사하는 명령을 넣지 않는다.
@@ -217,7 +249,7 @@ Remove-Item MuseDash_Mod_Assistant-vX.Y.Z.apk  # *.apk는 .gitignore에 있지�
    - 원인: 안드로이드 `ghost.ts`가 `battleSong()?.manifest.showGhostNotes === true`만 봤다. 전역 config(`고스트노트보이기`, 비서 앱 토글)를 완전히 무시해서 공식 곡과 설정 없는 커스텀 곡(korea, summertime)에서는 절대 켜지지 않았다. 또 PC 원본(`muse dash test/.../GhostNoteAlphaHold.cs`)에 있던 판마다 캐시 초기화(`ResetCache`, PnlBattle GameStart)가 빠져 있었다.
    - 해결: PC `GhostNoteVisibility` 규칙 그대로. 곡 `info.txt`에 값이 있으면 그 값, 없으면 `currentConfig.showGhostNotes`. `battleSerial()`이 바뀌면 `opaqueState`만 비운다. `originalAlphas`는 끌 때 되돌리려고 유지한다.
    - 확인: 공식 곡 플레이 중 `{"t":"ghost-alpha","anim":"in_nor_38","opaque":true}`가 찍혔다 (수정 전에는 공식 곡에서 이 이벤트가 없음). 개인 전체판·공개본 양쪽 `ghost.ts`에 반영했다.
-   - 공개본 동기화: 이때 공개본 `config.ts`(공용 config.txt 읽기)·`customTag.ts`(공용 아이콘 경로 탐색)도 전체판과 맞췄다. 이 세션 전 공개 릴리스는 전체판이라 원래 이 동작이었다. 아이콘 파일 자체는 건드리지 않았다.
+   - 공개본 동기화: 이때 공개본 `config.ts`(공용 config.txt 읽기)·`customTag.ts`(공용 아이콘 경로 탐색, 2026-11-13 리팩토링 뒤 `tag/icon.ts`)도 전체판과 맞췄다. 이 세션 전 공개 릴리스는 전체판이라 원래 이 동작이었다. 아이콘 파일 자체는 건드리지 않았다.
 12. **XAPK 설치가 OBB 단계에서 `ENOENT`로 실패 (2026-11-01, 실기 원인 확인)**:
    - 증상: [설치]를 누르면 "XAPK 처리 중 오류: /storage/emulated/0/Android/obb/<패키지>/main…obb: open failed: ENOENT". 로그 태그 `MuseDashAssistant`(v1.0.3에서 추가)에 스택이 남는다.
    - 원인: Android 11+에서 다른 앱의 `Android/obb/<패키지>/`는 '출처를 알 수 없는 앱 설치'(appop `REQUEST_INSTALL_PACKAGES`)를 허용받은 앱만 만들고 쓸 수 있다. `MANAGE_EXTERNAL_STORAGE`만으로는 안 된다. 허용 전엔 `mkdirs()`가 조용히 false를 돌려주고 쓰기가 `ENOENT`로 끝난다. v1.0.2까지는 이 권한을 OBB를 다 푼 **뒤** APK 설치 단계에서야 물어서, 이 기기(허용 안 함 상태)에선 한 번도 성공할 수 없었다.
@@ -247,3 +279,9 @@ Remove-Item MuseDash_Mod_Assistant-vX.Y.Z.apk  # *.apk는 .gitignore에 있지�
    - 릴리스 노트를 PowerShell 5.1 `Set-Content -Encoding utf8`로 만들었더니 BOM이 붙어, GitHub 릴리스 본문 맨 앞에 `U+FEFF`가 들어갔다. `gh release edit --notes-file`로 BOM을 뺀 파일을 다시 올려 고쳤다. 노트는 Git Bash heredoc이나 `[IO.File]::WriteAllText(path, text, (New-Object Text.UTF8Encoding $false))`로 만든다.
    - 태그를 브랜치 커밋에 먼저 붙였더니 PR 머지 커밋과 어긋났다. 트리는 같았지만 v2.0.0처럼 머지 커밋으로 옮겼다. 태그는 머지한 뒤에 붙인다.
    - `app.js`를 나눌 때 ES 모듈(`type="module"`)은 쓰지 않았다. `file:///android_asset`에서 모듈 로딩이 CORS로 막힐 수 있고, 실기기 테스트가 전역 함수(`confirmBox`)를 직접 부른다. 일반 `<script>`는 최상위 `const`·`function`을 전역 렉시컬 환경으로 공유하므로 읽는 순서만 지키면 된다.
+17. **v2.2.0 곡 규칙 이식 때 걸린 것들 (2026-11-14)**:
+   - JS와 Java의 공백 정의가 다르다. JS `trim()`·`\s`는 NBSP(U+00A0)·BOM(U+FEFF)·유니코드 공백까지 지우지만 Java `trim()`·`Character.isWhitespace`는 못 지운다 → `HwaManifest.jsTrim`/`isJsSpace`로 맞췄다. 줄 구분자도 JS `search(/[:=：]/)`처럼 "처음 나오는 것"이어야 한다(`=` 먼저 찾고 없으면 `:`가 아니다).
+   - 게임은 파일 이름을 `toLowerCase().localeCompare()`로 정렬한다. Java `compareTo`(코드포인트)와는 `_`·`-` 같은 기호가 섞일 때 순서가 다르다 → `Collator.getInstance(Locale.ROOT)`. info 파일·기본 채보가 '이름순 첫 번째'로 정해지는 경우에만 영향이 있다.
+   - JS `parseFloat`는 `0.12s`를 0.12로 읽는다. Java `Double.parseDouble`은 예외 → 앞쪽 숫자만 정규식으로 잘라 읽는다.
+   - Git Bash heredoc 안의 Python 문자열로 Java 소스를 고치다가 `"\n"` 문자열이 실제 줄바꿈으로 들어가 컴파일이 87줄 깨졌다. 다른 heredoc은 `'`가 섞여 bash가 `unexpected EOF`로 거부했다. 여러 줄 편집은 Edit 도구나, Write로 만든 스크립트 파일(`python -I 파일`)로 한다.
+   - 기기 화면 캡처가 보라색 그라데이션만 나오면 화면 보호기(`com.android.dreams.basic`, `mWakefulness=Dreaming`)다. `input keyevent KEYCODE_WAKEUP` 뒤 `am start -n com.hwa.musedash.assistant/.MainActivity`로 앞에 띄운다(`monkey`만으로는 안 올라옴).

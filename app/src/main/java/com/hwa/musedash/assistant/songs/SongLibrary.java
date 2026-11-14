@@ -44,23 +44,29 @@ public final class SongLibrary {
         return out;
     }
 
+    /** 곡 폴더 하나를 게임과 같은 규칙으로 읽는다(폴더 바로 아래 파일만, info 파일은 하나만). */
     static SongInfo read(File dir) {
-        SongInfo s = new SongInfo();
-        s.folder = dir.getName();
-        s.title = dir.getName();
-        s.path = dir.getAbsolutePath();
+        List<String> names = new ArrayList<>();
         File[] files = dir.listFiles();
-        if (files == null) return s;
-        for (File f : files) {
-            if (!f.isFile()) continue;
-            s.countFile(f.getName());
-            if (SongInfo.isInfoFile(f.getName())) {
-                try {
-                    s.applyInfoText(new String(Io.readAll(f), StandardCharsets.UTF_8));
-                } catch (IOException ignored) {
-                }
+        if (files != null) {
+            for (File f : files) if (f.isFile()) names.add(f.getName());
+        }
+        String infoName = ChartFiles.pickManifest(names);
+        String infoText = null;
+        if (infoName != null) {
+            try {
+                infoText = new String(Io.readAll(new File(dir, infoName)), StandardCharsets.UTF_8);
+            } catch (IOException ignored) {
             }
         }
+        SongInfo s = SongInfo.of(dir.getName(), names, infoText, rel -> {
+            try {
+                return SafePaths.resolveInside(dir, rel).isFile();
+            } catch (IOException e) {
+                return false;
+            }
+        });
+        s.path = dir.getAbsolutePath();
         return s;
     }
 
