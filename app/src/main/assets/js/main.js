@@ -45,7 +45,7 @@ const ACTIONS = {
   requestPermission: () => call('requestStoragePermission'),
   reloadConfig: () => { loadConfig(); toast('설정 파일을 다시 읽었습니다.'); },
   resetConfig,
-  launchGame: () => call('launchGame'),
+  launchGame: () => { state.storeInstalledNow = 0; call('launchGame'); },
   resetAllRecords,
   scanPackages,
   modalOk: () => closeModal(true),
@@ -68,6 +68,18 @@ document.addEventListener('click', (e) => {
 
 $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(false); });
 $('storeSearch').addEventListener('input', (e) => { state.storeQuery = e.target.value; renderStore(); });
+// 검색 키(엔터)를 누르면 키보드를 내려 결과를 보이게 한다.
+$('storeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+$('storeSearchClear').addEventListener('click', () => {
+  $('storeSearch').value = '';
+  state.storeQuery = '';
+  renderStore();
+});
+$('storeSort').addEventListener('change', (e) => {
+  state.storeSort = e.target.value;
+  try { localStorage.setItem('storeSort', state.storeSort); } catch (err) { /* 기억 못 해도 됨 */ }
+  renderStore();
+});
 $('refreshAllBtn').addEventListener('click', () => { refreshAppState(); onTabShown(currentTab(), true); });
 
 window.onAppResume = () => {
@@ -89,4 +101,8 @@ loadConfig();
 refreshSongs();
 let startTab = 'tab-config';
 try { startTab = localStorage.getItem('tab') || startTab; } catch (e) { /* 기본 탭 */ }
+try {
+  const sort = localStorage.getItem('storeSort');
+  if (sort && STORE_SORTS[sort]) { state.storeSort = sort; $('storeSort').value = sort; }
+} catch (e) { /* 기본 정렬 */ }
 showTab(startTab);
