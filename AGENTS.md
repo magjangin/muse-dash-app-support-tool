@@ -6,6 +6,7 @@
 
 ## 1. 대상 게임 및 환경 정보
 - **대상 게임 패키지**: `com.prpr.musedash.mod` (Muse Dash v6.8.0, Unity 2019.4.41f1, IL2CPP 64-bit arm64-v8a)
+- **뮤즈대시 2 감지 (주석으로 꺼 둠, 2026-11-15)**: 실제 패키지 이름을 몰라(검색으로 못 찾음) 추측값 `com.prpr.musedash2`로 코드만 넣고 주석 처리했다. 켜려면 이름을 Play `id=` 값으로 고치고 `MUSE_DASH_2` 주석을 `Paths`·`AppStatus`·`BridgeJson`·`AndroidBridge.getAppState`·`AndroidManifest.xml <queries>`·`assets/js/main.js` 여섯 곳에서 함께 푼다(`<queries>`를 빼먹으면 Android 11+에서 설치돼 있어도 '없음'). XAPK 탭의 파일 이름 강조(`XapkRules.looksLikeMuseDash`)는 이미 `musedash2` 파일도 잡는다.
 - **컴패니언 앱 패키지**: `com.hwa.musedash.assistant`
 - **테스트 실기기**: Samsung Galaxy S21 5G (`SM-G991N`, Android 15, 장치 ID: `R3CR10T2JFA`)
 - **전역 설정 경로**:

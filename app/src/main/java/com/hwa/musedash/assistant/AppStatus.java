@@ -37,6 +37,17 @@ final class AppStatus {
         }
     }
 
+    // MUSE_DASH_2 감지 (꺼 둠, Paths.MUSE_DASH_2_PACKAGE와 함께 푼다)
+    // /** 뮤즈대시 2가 없으면 null, versionName이 없으면 "". */
+    // static String museDash2Version(Context context) {
+    //     try {
+    //         PackageInfo info = context.getPackageManager().getPackageInfo(Paths.MUSE_DASH_2_PACKAGE, 0);
+    //         return info.versionName == null ? "" : info.versionName;
+    //     } catch (Exception e) {
+    //         return null;
+    //     }
+    // }
+
     /** Android 11+는 '모든 파일에 대한 접근' 설정 화면, 그 아래는 런타임 권한 요청. UI 스레드에서 부른다. */
     static void requestStoragePermission(Activity activity) {
         try {

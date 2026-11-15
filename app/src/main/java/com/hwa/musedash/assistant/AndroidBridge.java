@@ -56,6 +56,7 @@ public class AndroidBridge {
     public String getAppState() {
         return BridgeJson.appState(AppStatus.appVersion(activity), AppStatus.hasStoragePermission(activity),
                 AppStatus.gameVersion(activity), installer.canInstallPackages());
+        // MUSE_DASH_2 감지 (꺼 둠): 위 호출 인자 끝에 AppStatus.museDash2Version(activity)를 더한다.
     }
 
     @JavascriptInterface

@@ -11,6 +11,10 @@
     <!-- 모든 앱 목록 대신 필요한 것만 본다: 게임(설치 확인·실행·SongProvider 권한 부여)과 시스템 설치기. -->
     <queries>
         <package android:name="com.prpr.musedash.mod" />
+        <!-- MUSE_DASH_2 감지 (꺼 둠, Paths.MUSE_DASH_2_PACKAGE와 같은 이름으로 함께 푼다).
+             이게 없으면 Android 11+에서 getPackageInfo가 설치돼 있어도 '없음'으로 답한다.
+        <package android:name="com.prpr.musedash2" />
+        -->
         <intent>
             <action android:name="android.intent.action.INSTALL_PACKAGE" />
             <data android:mimeType="application/vnd.android.package-archive" />

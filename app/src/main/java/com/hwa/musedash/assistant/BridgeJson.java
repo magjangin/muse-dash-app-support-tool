@@ -26,6 +26,9 @@ final class BridgeJson {
             o.put("gameInstalled", gameVersion != null);
             o.put("gameVersion", gameVersion == null ? JSONObject.NULL : gameVersion);
             o.put("canInstallPackages", canInstallPackages);
+            // MUSE_DASH_2 감지 (꺼 둠): 이 메서드에 String museDash2Version 인자를 더하고 아래 두 줄을 푼다.
+            // o.put("museDash2Installed", museDash2Version != null);
+            // o.put("museDash2Version", museDash2Version == null ? JSONObject.NULL : museDash2Version);
         } catch (Exception ignored) {
         }
         return o.toString();

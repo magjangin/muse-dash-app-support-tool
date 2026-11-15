@@ -16,6 +16,10 @@ function refreshAppState() {
     gs.textContent = '뮤즈대시 모드 미설치 — XAPK 탭에서 설치하세요';
     gs.className = 'hero-status bad';
   }
+  // MUSE_DASH_2 감지 (꺼 둠): 네이티브 쪽 주석(Paths.MUSE_DASH_2_PACKAGE 등)을 함께 풀어야 값이 온다.
+  // if (state.app.museDash2Installed) {
+  //   gs.textContent += ` · 뮤즈대시 2 설치됨${state.app.museDash2Version ? ` (v${state.app.museDash2Version})` : ''}`;
+  // }
 }
 
 // ---------------------------------------------------------------- 탭 / 이벤트
