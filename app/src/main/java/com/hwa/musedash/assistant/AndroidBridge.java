@@ -15,8 +15,11 @@ import com.hwa.musedash.assistant.xapk.PackageInstaller;
 import java.io.File;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * WebView(assets/js)가 부르는 window.AndroidBridge. 실제 일은 기능별 클래스가 하고, 여기서는
@@ -34,6 +37,9 @@ public class AndroidBridge {
     private final SongDownloader downloader;
     private final PackageInstaller installer;
     private final ExecutorService background = Executors.newCachedThreadPool();
+    /** 받는 중인 앨범 id → 취소 표시. */
+    private final ConcurrentHashMap<String, AtomicBoolean> cancels = new ConcurrentHashMap<>();
+    private final AtomicInteger activeDownloads = new AtomicInteger();
 
     public AndroidBridge(MainActivity activity) {
         this.activity = activity;
@@ -104,21 +110,39 @@ public class AndroidBridge {
         });
     }
 
-    /** 진행: onSongProgress(albumId, percent, bytes) / 완료: onSongInstalled(albumId, folder) / 실패: onSongDownloadFailed(albumId, message) */
+    /**
+     * 진행: onSongProgress(albumId, percent, bytes) / 완료: onSongInstalled(albumId, folder) /
+     * 취소: onSongDownloadCancelled(albumId) / 실패: onSongDownloadFailed(albumId, message).
+     * 성공 안내는 화면이 한꺼번에 한다(여러 곡을 받을 때 토스트가 곡마다 뜨지 않게).
+     */
     @JavascriptInterface
     public void downloadSong(String albumId, String title, String filename) {
+        AtomicBoolean cancel = new AtomicBoolean();
+        if (cancels.putIfAbsent(albumId, cancel) != null) return; // 이미 받는 중
+        DownloadService.setActive(activity, activeDownloads.incrementAndGet());
         background.execute(() -> {
             try {
                 File dir = downloader.download(albumId, title, filename,
-                        (pct, bytes) -> activity.callJs("onSongProgress", albumId, pct, bytes));
-                toast("'" + title + "' 받기 완료! 게임을 다시 켜면 들어갑니다.");
+                        (pct, bytes) -> activity.callJs("onSongProgress", albumId, pct, bytes), cancel);
                 activity.callJs("onSongInstalled", albumId, dir.getName());
+            } catch (SongDownloader.CancelledException e) {
+                activity.callJs("onSongDownloadCancelled", albumId);
             } catch (Exception e) {
                 Log.w(TAG, "download failed: " + albumId, e);
                 toast("받기 실패: " + e.getMessage());
                 activity.callJs("onSongDownloadFailed", albumId, String.valueOf(e.getMessage()));
+            } finally {
+                cancels.remove(albumId);
+                DownloadService.setActive(activity, activeDownloads.decrementAndGet());
             }
         });
+    }
+
+    /** 받는 중인 곡을 멈춘다. 결과는 onSongDownloadCancelled(albumId). 이미 끝났으면 아무 일도 없다. */
+    @JavascriptInterface
+    public void cancelDownload(String albumId) {
+        AtomicBoolean cancel = cancels.get(albumId);
+        if (cancel != null) cancel.set(true);
     }
 
     // ---- 기록 초기화 예약 --------------------------------------------------------
