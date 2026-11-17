@@ -125,7 +125,52 @@ public class MainActivityDeviceTest {
             assertEquals("false", eval(sc, "document.getElementById('storeBulk').textContent.includes('새로 받은')"));
             eval(sc, "state.storeInstalledNow.clear(); true");
 
+            // 받는 중인 곡: [취소]가 보이고, 네이티브가 취소를 알리면 원래 [⬇ 받기]로 돌아온다
+            eval(sc, "state.downloads.t1 = 40; renderStore(); true");
+            assertEquals("2", eval(sc, "document.querySelectorAll('[data-album=t1] .item-actions button').length"));
+            assertEquals("\"취소\"", eval(sc, "document.querySelectorAll('[data-album=t1] .item-actions button')[1].textContent"));
+            eval(sc, "state.downloadCancelling.add('t1'); renderStore(); true");
+            assertEquals("\"취소 중…\"", eval(sc, "document.querySelectorAll('[data-album=t1] .item-actions button')[1].textContent"));
+            eval(sc, "window.onSongDownloadCancelled('t1'); true");
+            assertEquals("\"⬇ 받기\"", eval(sc, "document.querySelector('[data-album=t1] .item-actions button').textContent"));
+            assertEquals("0", eval(sc, "state.downloadCancelling.size"));
+            assertEquals("false", eval(sc, "'t1' in state.downloadErrors"));
+
             eval(sc, "document.querySelector('[data-tab=tab-config]').click()");
         }
+    }
+
+    /** 곡을 받는 동안 포그라운드 서비스가 알림과 함께 뜨고, 받기가 끝나면 잠시 뒤 내려간다. */
+    @Test
+    public void downloadService_runsAsForegroundWhileDownloading() throws Exception {
+        android.content.Context ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().getTargetContext();
+        try (ActivityScenario<MainActivity> sc = ActivityScenario.launch(MainActivity.class)) {
+            DownloadService.setActive(ctx, 1);
+            assertTrue("서비스가 포그라운드로 안 떴다", waitForService(true, 10));
+            // 0곡이 되어도 곧바로 내리지 않는다(다음 곡이 이어질 수 있어서). 그 사이 다시 시작하면 계속 떠 있다.
+            DownloadService.setActive(ctx, 0);
+            DownloadService.setActive(ctx, 1);
+            SystemClock.sleep(1500);
+            assertTrue(waitForService(true, 1));
+            DownloadService.setActive(ctx, 0);
+            assertTrue("서비스가 내려가지 않았다", waitForService(false, 30));
+        }
+    }
+
+    private static boolean waitForService(boolean running, int seconds) throws Exception {
+        for (int i = 0; i < seconds * 4; i++) {
+            android.app.ActivityManager am = (android.app.ActivityManager) androidx.test.platform.app.InstrumentationRegistry
+                    .getInstrumentation().getTargetContext().getSystemService(android.content.Context.ACTIVITY_SERVICE);
+            boolean found = false;
+            for (android.app.ActivityManager.RunningServiceInfo info : am.getRunningServices(100)) {
+                if (info.service.getClassName().equals(DownloadService.class.getName())) {
+                    found = info.foreground;
+                    break;
+                }
+            }
+            if (found == running) return true;
+            Thread.sleep(250);
+        }
+        return false;
     }
 }

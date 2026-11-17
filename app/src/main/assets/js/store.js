@@ -213,7 +213,10 @@ function albumRow(a, song) {
   if (dl === 'queued') {
     actions = el('div', { class: 'item-actions' }, el('button', { class: 'btn btn-small btn-ghost', text: '대기 중 ✕', onclick: () => cancelQueued(id) }));
   } else if (dl !== undefined) {
-    actions = el('div', { class: 'item-actions' }, el('button', { class: 'btn btn-small btn-ghost', disabled: true, text: dl >= 0 ? `${dl}%` : '받는 중' }));
+    const stopping = state.downloadCancelling.has(id);
+    actions = el('div', { class: 'item-actions' },
+      el('button', { class: 'btn btn-small btn-ghost', disabled: true, text: dl >= 0 ? `${dl}%` : '받는 중' }),
+      el('button', { class: 'btn btn-small btn-danger-soft', disabled: stopping, text: stopping ? '취소 중…' : '취소', onclick: () => cancelDownload(a) }));
   } else if (song) {
     const busy = !!state.deleting[norm(song.folder)];
     actions = el('div', { class: 'item-actions' },
@@ -294,6 +297,31 @@ function cancelQueued(id) {
   renderStore();
 }
 
+/** 받는 중인 곡을 멈춘다(받던 만큼은 버려지고, 다시 받으면 처음부터). 결과는 onSongDownloadCancelled. */
+async function cancelDownload(a) {
+  const id = String(a.id);
+  if (state.downloads[id] === undefined || state.downloads[id] === 'queued' || state.downloadCancelling.has(id)) return;
+  const ok = await confirmBox('받기 취소', `'${albumName(a)}' 받기를 멈춥니다.\n받던 내용은 버려지고, 다시 받으면 처음부터 받습니다.`, '받기 취소', true);
+  if (!ok || state.downloads[id] === undefined || state.downloads[id] === 'queued') return;
+  state.downloadCancelling.add(id);
+  call('cancelDownload', id);
+  renderStore();
+}
+
+/** 받기·취소·실패가 하나 끝날 때마다 부른다. 받는 중·대기 중인 곡이 하나도 없으면 이번에 받은 곡 수를 한 번에 알린다. */
+function finishDownload(id) {
+  delete state.downloads[id];
+  state.downloadCancelling.delete(id);
+  pumpDownloads();
+  if (Object.keys(state.downloads).length) return;
+  const batch = state.downloadBatch;
+  if (batch.done > 0) {
+    const one = batch.done === 1 && state.albums && state.albums.find((a) => String(a.id) === batch.last);
+    toast((one ? `'${albumName(one)}'` : `${batch.done}곡`) + ' 받기 완료! 게임을 다시 켜면 들어갑니다.');
+  }
+  state.downloadBatch = { done: 0, last: null };
+}
+
 window.onSongProgress = (id, pct) => {
   const cur = state.downloads[id];
   if (cur === undefined || cur === 'queued') return;
@@ -307,17 +335,23 @@ window.onSongProgress = (id, pct) => {
 };
 
 window.onSongInstalled = (id) => {
-  delete state.downloads[id];
   delete state.downloadErrors[id];
   state.storeInstalledNow.add(String(id));
-  pumpDownloads();
+  state.downloadBatch.done++;
+  state.downloadBatch.last = String(id);
+  finishDownload(id);
   refreshSongs();
   renderStore();
 };
 
 window.onSongDownloadFailed = (id, message) => {
-  delete state.downloads[id];
   state.downloadErrors[id] = message || '알 수 없는 오류';
-  pumpDownloads();
+  finishDownload(id);
+  renderStore();
+};
+
+window.onSongDownloadCancelled = (id) => {
+  delete state.downloadErrors[id];
+  finishDownload(id);
   renderStore();
 };

@@ -2,6 +2,7 @@ package com.hwa.musedash.assistant.songs;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -302,6 +303,45 @@ public class SongsTest {
             SongDownloader.resolveRedirect(from, "file:///etc/passwd");
             fail("file: redirect accepted");
         } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void extract_rejectsOversizedContent() throws IOException {
+        File dir = tmp.newFolder("out");
+        byte[] zipped = zip("a.bin", new String(new char[5000]).replace('\0', 'x'));
+        try {
+            SongDownloader.extract(new ByteArrayInputStream(zipped), dir, 1000);
+            fail("oversized zip accepted");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("너무 큽니다"));
+        }
+        // 상한 안이면 그대로 푼다
+        assertEquals(1, SongDownloader.extract(new ByteArrayInputStream(zipped), tmp.newFolder("ok"), 5000));
+    }
+
+    @Test
+    public void spaceProblem_knownAndUnknownLength() {
+        long mb = 1L << 20;
+        assertNull(SongDownloader.spaceProblem(300 * mb, 100 * mb));       // 100MB + 여유 64MB
+        assertNotNull(SongDownloader.spaceProblem(150 * mb, 100 * mb));
+        assertNull(SongDownloader.spaceProblem(300 * mb, -1));             // 크기를 모르면 256MB 이상
+        String msg = SongDownloader.spaceProblem(100 * mb, -1);
+        assertNotNull(msg);
+        assertTrue(msg.contains("256MB") && msg.contains("100MB"));
+    }
+
+    @Test
+    public void countingStream_stopsWhenCancelled() throws IOException {
+        java.util.concurrent.atomic.AtomicBoolean cancel = new java.util.concurrent.atomic.AtomicBoolean();
+        SongDownloader.CountingStream in = new SongDownloader.CountingStream(new ByteArrayInputStream(new byte[1000]), 1000, null, cancel);
+        byte[] buf = new byte[100];
+        assertEquals(100, in.read(buf, 0, 100));
+        cancel.set(true);
+        try {
+            in.read(buf, 0, 100);
+            fail("read after cancel");
+        } catch (SongDownloader.CancelledException expected) {
         }
     }
 
